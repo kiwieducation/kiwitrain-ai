@@ -13,6 +13,7 @@
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .loading-spinner { animation: spin 1s linear infinite; }
     #loading { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 16px; color: #6b7280; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #14b8a6; }
   </style>
 </head>
 <body>
@@ -57,6 +58,9 @@
       const BuildingIcon = () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01" /></svg>);
       const TaskIcon = () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>);
       const UserCheckIcon = () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><polyline points="17 11 19 13 23 9" /></svg>);
+      const MailIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>);
+      const KeyIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg>);
+      const SearchIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>);
 
       // Stat Card
       const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }) => (
@@ -66,21 +70,14 @@
               <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>{title}</div>
               <div style={{ fontSize: '32px', fontWeight: '700', color: '#1f2937', marginBottom: '4px' }}>{value}</div>
               {subtitle && <div style={{ fontSize: '13px', color: '#9ca3af' }}>{subtitle}</div>}
-              {trend && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: trend > 0 ? '#10b981' : '#ef4444', fontSize: '13px' }}>
-                  <TrendUpIcon />
-                  <span>{trend > 0 ? '+' : ''}{trend}% 较上周</span>
-                </div>
-              )}
+              {trend && (<div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: trend > 0 ? '#10b981' : '#ef4444', fontSize: '13px' }}><TrendUpIcon /><span>{trend > 0 ? '+' : ''}{trend}% 较上周</span></div>)}
             </div>
-            <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: color || '#f0fdfa', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0d9488' }}>
-              <Icon />
-            </div>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: color || '#f0fdfa', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0d9488' }}><Icon /></div>
           </div>
         </div>
       );
 
-      // Department Card
+      // Department Card for Dashboard
       const DepartmentCard = ({ department, stats }) => {
         const completionRate = stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0;
         return (
@@ -90,13 +87,8 @@
               <div style={{ backgroundColor: completionRate >= 80 ? '#d1fae5' : completionRate >= 50 ? '#fef3c7' : '#fee2e2', color: completionRate >= 80 ? '#059669' : completionRate >= 50 ? '#d97706' : '#dc2626', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{completionRate}%</div>
             </div>
             <div style={{ marginBottom: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>
-                <span>培训进度</span>
-                <span>{stats.completedTasks}/{stats.totalTasks} 任务</span>
-              </div>
-              <div style={{ height: '8px', backgroundColor: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${completionRate}%`, backgroundColor: completionRate >= 80 ? '#10b981' : completionRate >= 50 ? '#f59e0b' : '#ef4444', borderRadius: '4px', transition: 'width 0.5s ease' }} />
-              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}><span>培训进度</span><span>{stats.completedTasks}/{stats.totalTasks} 任务</span></div>
+              <div style={{ height: '8px', backgroundColor: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${completionRate}%`, backgroundColor: completionRate >= 80 ? '#10b981' : completionRate >= 50 ? '#f59e0b' : '#ef4444', borderRadius: '4px', transition: 'width 0.5s ease' }} /></div>
             </div>
             <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: '#6b7280' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><UsersIcon /><span>{stats.employeeCount} 员工</span></div>
@@ -114,15 +106,10 @@
             <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '600', fontSize: '16px', flexShrink: 0 }}>{employee.name[0]}</div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div>
-                  <div style={{ fontWeight: '600', color: '#1f2937', fontSize: '15px' }}>{employee.name}</div>
-                  <div style={{ fontSize: '12px', color: '#9ca3af' }}>{employee.department}</div>
-                </div>
+                <div><div style={{ fontWeight: '600', color: '#1f2937', fontSize: '15px' }}>{employee.name}</div><div style={{ fontSize: '12px', color: '#9ca3af' }}>{employee.department}</div></div>
                 <div style={{ backgroundColor: completionRate === 100 ? '#d1fae5' : '#f3f4f6', color: completionRate === 100 ? '#059669' : '#6b7280', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{completionRate === 100 ? '已完成' : `${completionRate}%`}</div>
               </div>
-              <div style={{ height: '6px', backgroundColor: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${completionRate}%`, backgroundColor: completionRate === 100 ? '#10b981' : '#0d9488', borderRadius: '3px' }} />
-              </div>
+              <div style={{ height: '6px', backgroundColor: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${completionRate}%`, backgroundColor: completionRate === 100 ? '#10b981' : '#0d9488', borderRadius: '3px' }} /></div>
             </div>
           </div>
         );
@@ -143,11 +130,9 @@
             const deptStats = departments.map(dept => {
               const deptModules = modules?.filter(m => m.department_id === dept.id) || [];
               const deptTasks = deptModules.flatMap(m => m.training_tasks || []);
+              const deptUsers = users?.filter(u => u.department_id === dept.id) || [];
               const completedCount = Math.floor(deptTasks.length * (0.3 + Math.random() * 0.5));
-              return {
-                department: dept,
-                stats: { moduleCount: deptModules.length, totalTasks: deptTasks.length, completedTasks: completedCount, employeeCount: Math.floor(Math.random() * 5) + 2 }
-              };
+              return { department: dept, stats: { moduleCount: deptModules.length, totalTasks: deptTasks.length, completedTasks: completedCount, employeeCount: deptUsers.length || Math.floor(Math.random() * 5) + 2 } };
             });
 
             setStats({
@@ -158,14 +143,15 @@
               departmentStats: deptStats
             });
 
-            setEmployees([
+            const demoEmployees = [
               { id: 1, name: '张小明', department: '顾问组', progress: { totalTasks: 5, completedTasks: 5 } },
               { id: 2, name: '李华', department: '顾问组', progress: { totalTasks: 5, completedTasks: 4 } },
               { id: 3, name: '王芳', department: '导师组', progress: { totalTasks: 5, completedTasks: 3 } },
               { id: 4, name: '刘洋', department: 'BD组', progress: { totalTasks: 5, completedTasks: 2 } },
               { id: 5, name: '陈静', department: '市场组', progress: { totalTasks: 5, completedTasks: 4 } },
               { id: 6, name: '赵强', department: '财务组', progress: { totalTasks: 5, completedTasks: 1 } },
-            ]);
+            ];
+            setEmployees(users?.length > 0 ? users.map(u => ({ ...u, department: departments.find(d => d.id === u.department_id)?.name || '未分配', progress: { totalTasks: 5, completedTasks: Math.floor(Math.random() * 5) + 1 } })) : demoEmployees);
             setLoading(false);
           };
           if (departments.length > 0) fetchData();
@@ -175,31 +161,21 @@
 
         return (
           <div>
-            <div style={{ marginBottom: '32px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}><DashboardIcon /><h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937', margin: 0 }}>总览 Dashboard</h1></div>
-              <p style={{ fontSize: '15px', color: '#6b7280', margin: 0 }}>查看公司培训整体情况与员工学习进度</p>
-            </div>
-
+            <div style={{ marginBottom: '32px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}><DashboardIcon /><h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937', margin: 0 }}>总览 Dashboard</h1></div><p style={{ fontSize: '15px', color: '#6b7280', margin: 0 }}>查看公司培训整体情况与员工学习进度</p></div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
               <StatCard title="部门总数" value={stats.totalDepartments} subtitle="活跃部门" icon={BuildingIcon} color="#f0fdfa" />
               <StatCard title="培训模块" value={stats.totalModules} subtitle="课程模块" icon={DocumentIcon} color="#fef3c7" />
               <StatCard title="培训任务" value={stats.totalTasks} subtitle="总任务数" icon={TaskIcon} color="#dbeafe" />
               <StatCard title="员工人数" value={stats.totalEmployees} subtitle="在培人员" icon={UserCheckIcon} color="#fce7f3" trend={12} />
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #e5e7eb' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}><BuildingIcon />部门培训概览</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {stats.departmentStats.map((item, i) => <DepartmentCard key={i} department={item.department} stats={item.stats} />)}
-                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>{stats.departmentStats.map((item, i) => <DepartmentCard key={i} department={item.department} stats={item.stats} />)}</div>
               </div>
-
               <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #e5e7eb' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}><UsersIcon />员工培训进度</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {employees.map(emp => <EmployeeProgressCard key={emp.id} employee={emp} progress={emp.progress} />)}
-                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>{employees.slice(0, 6).map(emp => <EmployeeProgressCard key={emp.id} employee={emp} progress={emp.progress} />)}</div>
               </div>
             </div>
           </div>
@@ -214,9 +190,7 @@
           <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '16px 20px', marginBottom: '12px', border: '1px solid #e8e8e8', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
-                <div onClick={handleToggle} style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: isCompleted ? '#10b981' : 'transparent', border: isCompleted ? 'none' : '2px solid #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}>
-                  {loading ? <LoadingSpinner /> : isCompleted && <CheckIcon />}
-                </div>
+                <div onClick={handleToggle} style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: isCompleted ? '#10b981' : 'transparent', border: isCompleted ? 'none' : '2px solid #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}>{loading ? <LoadingSpinner /> : isCompleted && <CheckIcon />}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '15px', fontWeight: '500', color: '#1f2937', lineHeight: '1.5', marginBottom: '8px', textDecoration: isCompleted ? 'line-through' : 'none', opacity: isCompleted ? 0.7 : 1 }}>{task.title}</div>
                   <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -226,12 +200,10 @@
                   </div>
                 </div>
               </div>
-              {isAdmin && (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={() => onEdit(task)} style={{ padding: '6px', borderRadius: '6px', border: 'none', backgroundColor: '#f3f4f6', cursor: 'pointer', color: '#6b7280' }}><EditIcon /></button>
-                  <button onClick={() => onDelete(task.id)} style={{ padding: '6px', borderRadius: '6px', border: 'none', backgroundColor: '#fef2f2', cursor: 'pointer', color: '#ef4444' }}><DeleteIcon /></button>
-                </div>
-              )}
+              {isAdmin && (<div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => onEdit(task)} style={{ padding: '6px', borderRadius: '6px', border: 'none', backgroundColor: '#f3f4f6', cursor: 'pointer', color: '#6b7280' }}><EditIcon /></button>
+                <button onClick={() => onDelete(task.id)} style={{ padding: '6px', borderRadius: '6px', border: 'none', backgroundColor: '#fef2f2', cursor: 'pointer', color: '#ef4444' }}><DeleteIcon /></button>
+              </div>)}
             </div>
           </div>
         );
@@ -249,12 +221,10 @@
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#9ca3af', fontSize: '13px' }}><ClockIcon /><span>{module.duration}</span></div>
               <ChevronIcon expanded={isExpanded} />
             </div>
-            {isExpanded && (
-              <div style={{ marginLeft: '4px' }}>
-                {module.training_tasks?.map(task => <TrainingTask key={task.id} task={task} isCompleted={userProgress?.find(p => p.task_id === task.id)?.is_completed || false} onToggleComplete={onToggleComplete} onEdit={onEditTask} onDelete={onDeleteTask} isAdmin={isAdmin} />)}
-                {isAdmin && <button onClick={() => onAddTask(module.id)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderRadius: '10px', border: '2px dashed #d1d5db', backgroundColor: 'transparent', color: '#6b7280', fontSize: '14px', cursor: 'pointer', width: '100%', justifyContent: 'center' }}><PlusIcon />添加任务</button>}
-              </div>
-            )}
+            {isExpanded && (<div style={{ marginLeft: '4px' }}>
+              {module.training_tasks?.map(task => <TrainingTask key={task.id} task={task} isCompleted={userProgress?.find(p => p.task_id === task.id)?.is_completed || false} onToggleComplete={onToggleComplete} onEdit={onEditTask} onDelete={onDeleteTask} isAdmin={isAdmin} />)}
+              {isAdmin && <button onClick={() => onAddTask(module.id)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderRadius: '10px', border: '2px dashed #d1d5db', backgroundColor: 'transparent', color: '#6b7280', fontSize: '14px', cursor: 'pointer', width: '100%', justifyContent: 'center' }}><PlusIcon />添加任务</button>}
+            </div>)}
           </div>
         );
       };
@@ -269,10 +239,7 @@
             <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', width: '500px', maxWidth: '90vw' }}>
               <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '600' }}>{task ? '编辑任务' : '添加任务'}</h3>
               <form onSubmit={handleSubmit}>
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>任务标题</label>
-                  <textarea value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', minHeight: '80px', resize: 'vertical', boxSizing: 'border-box' }} required />
-                </div>
+                <div style={{ marginBottom: '16px' }}><label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>任务标题</label><textarea value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', minHeight: '80px', resize: 'vertical', boxSizing: 'border-box' }} required /></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                   <div><label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>资料数量</label><input type="number" min="0" value={formData.materials_count} onChange={(e) => setFormData({ ...formData, materials_count: parseInt(e.target.value) || 0 })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', boxSizing: 'border-box' }} /></div>
                   <div><label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>考核题数</label><input type="number" min="0" value={formData.quiz_count} onChange={(e) => setFormData({ ...formData, quiz_count: parseInt(e.target.value) || 0 })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', boxSizing: 'border-box' }} /></div>
@@ -291,26 +258,299 @@
       // Training Page
       const TrainingPage = ({ departments, selectedDepartment, setSelectedDepartment, trainingModules, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, isAdmin }) => (
         <div>
-          <div style={{ marginBottom: '32px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}><SparklesIcon /><h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937', margin: 0 }}>智能培训计划生成器 {isAdmin && '(管理员)'}</h1></div>
-            <p style={{ fontSize: '15px', color: '#6b7280', margin: 0 }}>{isAdmin ? '作为管理员，您可以直接编辑各部门的培训内容，更改将即时生效。' : '完成以下培训任务，开始你的职业之旅。'}</p>
-          </div>
+          <div style={{ marginBottom: '32px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}><SparklesIcon /><h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937', margin: 0 }}>智能培训计划生成器 {isAdmin && '(管理员)'}</h1></div><p style={{ fontSize: '15px', color: '#6b7280', margin: 0 }}>{isAdmin ? '作为管理员，您可以直接编辑各部门的培训内容，更改将即时生效。' : '完成以下培训任务，开始你的职业之旅。'}</p></div>
           <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '32px' }}>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>目标部门 / 岗位</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {departments.map(dept => (
-                  <div key={dept.id} onClick={() => setSelectedDepartment(dept)} style={{ padding: '14px 18px', borderRadius: '10px', border: selectedDepartment?.id === dept.id ? '2px solid #14b8a6' : '1px solid #e5e7eb', backgroundColor: selectedDepartment?.id === dept.id ? '#f0fdfa' : '#ffffff', color: selectedDepartment?.id === dept.id ? '#0d9488' : '#374151', fontWeight: selectedDepartment?.id === dept.id ? '600' : '500', fontSize: '15px', cursor: 'pointer' }}>{dept.name}</div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1f2937', marginBottom: '24px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>{selectedDepartment?.name || ''} - 入职培训日程</h2>
-              {trainingModules.length === 0 ? <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af' }}><p>暂无培训内容</p></div> : trainingModules.map(module => <DayModule key={module.id} module={module} userProgress={userProgress} onToggleComplete={onToggleComplete} onEditTask={onEditTask} onDeleteTask={onDeleteTask} onAddTask={onAddTask} isAdmin={isAdmin} />)}
-            </div>
+            <div><div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>目标部门 / 岗位</div><div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>{departments.map(dept => (<div key={dept.id} onClick={() => setSelectedDepartment(dept)} style={{ padding: '14px 18px', borderRadius: '10px', border: selectedDepartment?.id === dept.id ? '2px solid #14b8a6' : '1px solid #e5e7eb', backgroundColor: selectedDepartment?.id === dept.id ? '#f0fdfa' : '#ffffff', color: selectedDepartment?.id === dept.id ? '#0d9488' : '#374151', fontWeight: selectedDepartment?.id === dept.id ? '600' : '500', fontSize: '15px', cursor: 'pointer' }}>{dept.name}</div>))}</div></div>
+            <div><h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1f2937', marginBottom: '24px', paddingBottom: '16px', borderBottom: '2px solid #e5e7eb' }}>{selectedDepartment?.name || ''} - 入职培训日程</h2>{trainingModules.length === 0 ? <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af' }}><p>暂无培训内容</p></div> : trainingModules.map(module => <DayModule key={module.id} module={module} userProgress={userProgress} onToggleComplete={onToggleComplete} onEditTask={onEditTask} onDeleteTask={onDeleteTask} onAddTask={onAddTask} isAdmin={isAdmin} />)}</div>
           </div>
         </div>
       );
+
+      // Users Management Page
+      const UsersPage = ({ departments, supabaseClient, onDepartmentsChange }) => {
+        const [activeTab, setActiveTab] = useState('employees');
+        const [users, setUsers] = useState([]);
+        const [searchTerm, setSearchTerm] = useState('');
+        const [loading, setLoading] = useState(true);
+        const [modalState, setModalState] = useState({ open: false, type: null, data: null });
+
+        const fetchUsers = async () => {
+          const { data } = await supabaseClient.from('users').select('*').order('created_at', { ascending: false });
+          setUsers(data || []);
+          setLoading(false);
+        };
+
+        useEffect(() => { fetchUsers(); }, []);
+
+        const handleSaveUser = async (userData) => {
+          if (userData.id) {
+            await supabaseClient.from('users').update({ name: userData.name, email: userData.email, department_id: userData.department_id, role: userData.role }).eq('id', userData.id);
+          } else {
+            await supabaseClient.from('users').insert({ name: userData.name, email: userData.email, department_id: userData.department_id, role: userData.role || 'employee' });
+          }
+          await fetchUsers();
+        };
+
+        const handleDeleteUser = async (id) => {
+          if (!confirm('确定要删除这个员工吗？')) return;
+          await supabaseClient.from('users').delete().eq('id', id);
+          await fetchUsers();
+        };
+
+        const handleSaveDepartment = async (deptData) => {
+          if (deptData.id) {
+            await supabaseClient.from('departments').update({ name: deptData.name, description: deptData.description }).eq('id', deptData.id);
+          } else {
+            const { data: existing } = await supabaseClient.from('departments').select('sort_order').order('sort_order', { ascending: false }).limit(1);
+            await supabaseClient.from('departments').insert({ name: deptData.name, description: deptData.description, sort_order: (existing?.[0]?.sort_order || 0) + 1 });
+          }
+          onDepartmentsChange();
+        };
+
+        const handleDeleteDepartment = async (id) => {
+          if (!confirm('确定要删除这个部门吗？删除后该部门下的员工将变为未分配状态。')) return;
+          await supabaseClient.from('departments').delete().eq('id', id);
+          onDepartmentsChange();
+        };
+
+        const filteredUsers = users.filter(u => u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+        return (
+          <div>
+            <div style={{ marginBottom: '32px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}><UsersIcon /><h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937', margin: 0 }}>账号管理</h1></div><p style={{ fontSize: '15px', color: '#6b7280', margin: 0 }}>管理部门和员工账号信息</p></div>
+
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '2px solid #e5e7eb', paddingBottom: '0' }}>
+              <button onClick={() => setActiveTab('employees')} style={{ padding: '12px 24px', fontSize: '15px', fontWeight: activeTab === 'employees' ? '600' : '500', color: activeTab === 'employees' ? '#0d9488' : '#6b7280', backgroundColor: 'transparent', border: 'none', borderBottom: activeTab === 'employees' ? '2px solid #0d9488' : '2px solid transparent', marginBottom: '-2px', cursor: 'pointer' }}>员工管理</button>
+              <button onClick={() => setActiveTab('departments')} style={{ padding: '12px 24px', fontSize: '15px', fontWeight: activeTab === 'departments' ? '600' : '500', color: activeTab === 'departments' ? '#0d9488' : '#6b7280', backgroundColor: 'transparent', border: 'none', borderBottom: activeTab === 'departments' ? '2px solid #0d9488' : '2px solid transparent', marginBottom: '-2px', cursor: 'pointer' }}>部门管理</button>
+            </div>
+
+            {activeTab === 'employees' && (
+              <div>
+                {/* Search and Add */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div style={{ position: 'relative', width: '300px' }}>
+                    <SearchIcon style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                    <input type="text" placeholder="搜索员工姓名或邮箱..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px 12px 10px 40px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '14px' }} />
+                  </div>
+                  <button onClick={() => setModalState({ open: true, type: 'user', data: null })} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '10px', border: 'none', backgroundColor: '#0d9488', color: 'white', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}><PlusIcon />添加员工</button>
+                </div>
+
+                {/* Employees Table */}
+                <div style={{ backgroundColor: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f9fafb' }}>
+                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>员工信息</th>
+                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>企业邮箱</th>
+                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>所属部门</th>
+                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>角色</th>
+                        <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '13px', fontWeight: '600', color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <tr><td colSpan="5" style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}><LoadingSpinner /></td></tr>
+                      ) : filteredUsers.length === 0 ? (
+                        <tr><td colSpan="5" style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>暂无员工数据</td></tr>
+                      ) : filteredUsers.map(user => (
+                        <tr key={user.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '16px 20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '600' }}>{user.name?.[0] || '?'}</div>
+                              <div><div style={{ fontWeight: '600', color: '#1f2937' }}>{user.name}</div></div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '16px 20px', color: '#6b7280', fontSize: '14px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MailIcon />{user.email}</div></td>
+                          <td style={{ padding: '16px 20px' }}><span style={{ padding: '4px 12px', borderRadius: '20px', backgroundColor: '#f0fdfa', color: '#0d9488', fontSize: '13px', fontWeight: '500' }}>{departments.find(d => d.id === user.department_id)?.name || '未分配'}</span></td>
+                          <td style={{ padding: '16px 20px' }}><span style={{ padding: '4px 12px', borderRadius: '20px', backgroundColor: user.role === 'admin' ? '#fef3c7' : '#f3f4f6', color: user.role === 'admin' ? '#d97706' : '#6b7280', fontSize: '13px', fontWeight: '500' }}>{user.role === 'admin' ? '管理员' : '员工'}</span></td>
+                          <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                            <button onClick={() => setModalState({ open: true, type: 'user', data: user })} style={{ padding: '8px', borderRadius: '8px', border: 'none', backgroundColor: '#f3f4f6', cursor: 'pointer', color: '#6b7280', marginRight: '8px' }}><EditIcon /></button>
+                            <button onClick={() => handleDeleteUser(user.id)} style={{ padding: '8px', borderRadius: '8px', border: 'none', backgroundColor: '#fef2f2', cursor: 'pointer', color: '#ef4444' }}><DeleteIcon /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'departments' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+                  <button onClick={() => setModalState({ open: true, type: 'department', data: null })} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '10px', border: 'none', backgroundColor: '#0d9488', color: 'white', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}><PlusIcon />添加部门</button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                  {departments.map(dept => {
+                    const deptUsers = users.filter(u => u.department_id === dept.id);
+                    return (
+                      <div key={dept.id} style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #e5e7eb' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                          <div>
+                            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>{dept.name}</h3>
+                            <p style={{ fontSize: '13px', color: '#9ca3af' }}>{dept.description || '暂无描述'}</p>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => setModalState({ open: true, type: 'department', data: dept })} style={{ padding: '8px', borderRadius: '8px', border: 'none', backgroundColor: '#f3f4f6', cursor: 'pointer', color: '#6b7280' }}><EditIcon /></button>
+                            <button onClick={() => handleDeleteDepartment(dept.id)} style={{ padding: '8px', borderRadius: '8px', border: 'none', backgroundColor: '#fef2f2', cursor: 'pointer', color: '#ef4444' }}><DeleteIcon /></button>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '10px' }}>
+                          <UsersIcon />
+                          <span style={{ fontSize: '14px', color: '#6b7280' }}>{deptUsers.length} 名员工</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* User Modal */}
+            {modalState.open && modalState.type === 'user' && (
+              <UserModal user={modalState.data} departments={departments} onSave={handleSaveUser} onClose={() => setModalState({ open: false, type: null, data: null })} />
+            )}
+
+            {/* Department Modal */}
+            {modalState.open && modalState.type === 'department' && (
+              <DepartmentModal department={modalState.data} onSave={handleSaveDepartment} onClose={() => setModalState({ open: false, type: null, data: null })} />
+            )}
+          </div>
+        );
+      };
+
+      // User Modal
+      const UserModal = ({ user, departments, onSave, onClose }) => {
+        const [formData, setFormData] = useState({
+          name: user?.name || '',
+          username: user?.email?.split('@')[0] || '',
+          password: '',
+          department_id: user?.department_id || '',
+          role: user?.role || 'employee'
+        });
+        const [saving, setSaving] = useState(false);
+        const [error, setError] = useState('');
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          setError('');
+
+          if (!formData.name.trim()) { setError('请输入姓名'); return; }
+          if (!formData.username.trim()) { setError('请输入用户名'); return; }
+          if (!user && !formData.password) { setError('请设置初始密码'); return; }
+          if (!formData.department_id) { setError('请选择所属部门'); return; }
+
+          setSaving(true);
+          await onSave({
+            id: user?.id,
+            name: formData.name,
+            email: formData.username + '@mykiwiedu.com',
+            department_id: formData.department_id,
+            role: formData.role
+          });
+          setSaving(false);
+          onClose();
+        };
+
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '28px', width: '480px', maxWidth: '90vw' }}>
+              <h3 style={{ margin: '0 0 24px', fontSize: '20px', fontWeight: '600' }}>{user ? '编辑员工' : '添加员工'}</h3>
+              
+              {error && <div style={{ padding: '12px', backgroundColor: '#fef2f2', color: '#dc2626', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' }}>{error}</div>}
+              
+              <form onSubmit={handleSubmit}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>姓名 *</label>
+                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="请输入员工姓名" style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '14px', boxSizing: 'border-box' }} />
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>用户名 *</label>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <input type="text" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') })} placeholder="username" style={{ flex: 1, padding: '12px 14px', borderRadius: '10px 0 0 10px', border: '1px solid #e5e7eb', borderRight: 'none', fontSize: '14px', boxSizing: 'border-box' }} />
+                    <span style={{ padding: '12px 14px', backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '0 10px 10px 0', color: '#6b7280', fontSize: '14px' }}>@mykiwiedu.com</span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>{user ? '重置密码' : '初始密码 *'}</label>
+                  <div style={{ position: 'relative' }}>
+                    <input type="text" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder={user ? '留空则不修改密码' : '请设置初始密码'} style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '14px', boxSizing: 'border-box' }} />
+                    <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }}><KeyIcon /></div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>所属部门 *</label>
+                  <select value={formData.department_id} onChange={(e) => setFormData({ ...formData, department_id: e.target.value })} style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '14px', boxSizing: 'border-box', backgroundColor: 'white' }}>
+                    <option value="">请选择部门</option>
+                    {departments.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>角色</label>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderRadius: '10px', border: formData.role === 'employee' ? '2px solid #0d9488' : '1px solid #e5e7eb', backgroundColor: formData.role === 'employee' ? '#f0fdfa' : 'white', cursor: 'pointer' }}>
+                      <input type="radio" name="role" value="employee" checked={formData.role === 'employee'} onChange={(e) => setFormData({ ...formData, role: e.target.value })} style={{ display: 'none' }} />
+                      <span style={{ fontSize: '14px', color: formData.role === 'employee' ? '#0d9488' : '#6b7280' }}>普通员工</span>
+                    </label>
+                    <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderRadius: '10px', border: formData.role === 'admin' ? '2px solid #0d9488' : '1px solid #e5e7eb', backgroundColor: formData.role === 'admin' ? '#f0fdfa' : 'white', cursor: 'pointer' }}>
+                      <input type="radio" name="role" value="admin" checked={formData.role === 'admin'} onChange={(e) => setFormData({ ...formData, role: e.target.value })} style={{ display: 'none' }} />
+                      <span style={{ fontSize: '14px', color: formData.role === 'admin' ? '#0d9488' : '#6b7280' }}>管理员</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={onClose} style={{ padding: '12px 24px', borderRadius: '10px', border: '1px solid #e5e7eb', backgroundColor: 'white', fontSize: '14px', cursor: 'pointer' }}>取消</button>
+                  <button type="submit" disabled={saving} style={{ padding: '12px 24px', borderRadius: '10px', border: 'none', backgroundColor: '#0d9488', color: 'white', fontSize: '14px', fontWeight: '500', cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? '保存中...' : '保存'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      };
+
+      // Department Modal
+      const DepartmentModal = ({ department, onSave, onClose }) => {
+        const [formData, setFormData] = useState({ name: department?.name || '', description: department?.description || '' });
+        const [saving, setSaving] = useState(false);
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          if (!formData.name.trim()) return;
+          setSaving(true);
+          await onSave({ id: department?.id, name: formData.name, description: formData.description });
+          setSaving(false);
+          onClose();
+        };
+
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '28px', width: '420px', maxWidth: '90vw' }}>
+              <h3 style={{ margin: '0 0 24px', fontSize: '20px', fontWeight: '600' }}>{department ? '编辑部门' : '添加部门'}</h3>
+              <form onSubmit={handleSubmit}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>部门名称 *</label>
+                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="请输入部门名称" style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '14px', boxSizing: 'border-box' }} required />
+                </div>
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>部门描述</label>
+                  <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="请输入部门描述（选填）" style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '14px', minHeight: '80px', resize: 'vertical', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={onClose} style={{ padding: '12px 24px', borderRadius: '10px', border: '1px solid #e5e7eb', backgroundColor: 'white', fontSize: '14px', cursor: 'pointer' }}>取消</button>
+                  <button type="submit" disabled={saving} style={{ padding: '12px 24px', borderRadius: '10px', border: 'none', backgroundColor: '#0d9488', color: 'white', fontSize: '14px', fontWeight: '500', cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? '保存中...' : '保存'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      };
 
       // Main App
       function KiwiTrainAI() {
@@ -336,7 +576,7 @@
         const fetchDepartments = async () => {
           const { data, error } = await supabaseClient.from('departments').select('*').order('sort_order');
           if (error) { setError('获取部门数据失败: ' + error.message); return; }
-          if (data?.length > 0) { setDepartments(data); setSelectedDepartment(data[0]); }
+          if (data?.length > 0) { setDepartments(data); if (!selectedDepartment) setSelectedDepartment(data[0]); }
         };
 
         const fetchTrainingModules = async () => {
@@ -367,7 +607,7 @@
 
         const handleDeleteTask = async (taskId) => { if (!confirm('确定要删除这个任务吗？')) return; await supabaseClient.from('training_tasks').delete().eq('id', taskId); await fetchTrainingModules(); };
 
-        useEffect(() => { (async () => { setLoading(true); setCurrentUser({ id: 'demo-user-id', name: '管理员', role: 'admin', email: 'admin@kiwi.com' }); await fetchDepartments(); setLoading(false); })(); }, []);
+        useEffect(() => { (async () => { setLoading(true); setCurrentUser({ id: 'demo-user-id', name: '管理员', role: 'admin', email: 'admin@mykiwiedu.com' }); await fetchDepartments(); setLoading(false); })(); }, []);
         useEffect(() => { if (selectedDepartment) fetchTrainingModules(); }, [selectedDepartment]);
 
         if (loading) return (<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#f8fafa', flexDirection: 'column', gap: '12px' }}><LoadingSpinner /><span style={{ color: '#6b7280' }}>加载中...</span></div>);
@@ -379,7 +619,7 @@
             case 'training': return <TrainingPage departments={departments} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} trainingModules={trainingModules} userProgress={userProgress} onToggleComplete={handleToggleComplete} onEditTask={(task) => setModalState({ open: true, task, moduleId: task.module_id })} onDeleteTask={handleDeleteTask} onAddTask={(moduleId) => setModalState({ open: true, task: null, moduleId })} isAdmin={isAdmin} />;
             case 'roleplay': return <div style={{ textAlign: 'center', padding: '60px', color: '#9ca3af' }}><RolePlayIcon /><h2 style={{ marginTop: '16px', color: '#1f2937' }}>AI 陪练</h2><p>功能开发中...</p></div>;
             case 'resources': return <div style={{ textAlign: 'center', padding: '60px', color: '#9ca3af' }}><ResourcesIcon /><h2 style={{ marginTop: '16px', color: '#1f2937' }}>资料库</h2><p>功能开发中...</p></div>;
-            case 'users': return <div style={{ textAlign: 'center', padding: '60px', color: '#9ca3af' }}><UsersIcon /><h2 style={{ marginTop: '16px', color: '#1f2937' }}>账号管理</h2><p>功能开发中...</p></div>;
+            case 'users': return <UsersPage departments={departments} supabaseClient={supabaseClient} onDepartmentsChange={fetchDepartments} />;
             default: return null;
           }
         };
