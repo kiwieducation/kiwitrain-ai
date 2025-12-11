@@ -7,7 +7,6 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -25,965 +24,1024 @@
     .loading-spinner {
       animation: spin 1s linear infinite;
     }
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-size: 16px;
+      color: #6b7280;
+    }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root"><div id="loading">加载中...</div></div>
   
+  <script>
+    // 动态加载 Supabase
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    script.onload = function() {
+      console.log('Supabase loaded successfully');
+      window.initApp();
+    };
+    script.onerror = function() {
+      document.getElementById('loading').innerHTML = '加载失败，请刷新页面';
+    };
+    document.head.appendChild(script);
+  </script>
+
   <script type="text/babel">
     const { useState, useEffect, useCallback } = React;
 
-    // =============================================
-    // Supabase 配置
-    // =============================================
-    const SUPABASE_URL = 'https://ylrppnfncsxuynnzthum.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlscnBwbmZuY3N4dXlubnp0aHVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MTM4MjgsImV4cCI6MjA4MDk4OTgyOH0.MQ_iqHhxCIiw6k03Sfv0m2DSlcCXs5_wsvZbjANRGZg';
+    // 初始化函数
+    window.initApp = function() {
+      // =============================================
+      // Supabase 配置
+      // =============================================
+      const SUPABASE_URL = 'https://ylrppnfncsxuynnzthum.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlscnBwbmZuY3N4dXlubnp0aHVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MTM4MjgsImV4cCI6MjA4MDk4OTgyOH0.MQ_iqHhxCIiw6k03Sfv0m2DSlcCXs5_wsvZbjANRGZg';
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // =============================================
-    // SVG Icons
-    // =============================================
-    const DashboardIcon = () => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <rect x="14" y="14" width="7" height="7" rx="1" />
-      </svg>
-    );
+      // =============================================
+      // SVG Icons
+      // =============================================
+      const DashboardIcon = () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+      );
 
-    const TrainingIcon = () => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-      </svg>
-    );
+      const TrainingIcon = () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        </svg>
+      );
 
-    const RolePlayIcon = () => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <path d="M8 21h8" />
-        <path d="M12 17v4" />
-        <circle cx="12" cy="10" r="2" />
-      </svg>
-    );
+      const RolePlayIcon = () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <path d="M8 21h8" />
+          <path d="M12 17v4" />
+          <circle cx="12" cy="10" r="2" />
+        </svg>
+      );
 
-    const ResourcesIcon = () => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-      </svg>
-    );
+      const ResourcesIcon = () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+        </svg>
+      );
 
-    const UsersIcon = () => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    );
+      const UsersIcon = () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      );
 
-    const LogoutIcon = () => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-        <polyline points="16 17 21 12 16 7" />
-        <line x1="21" y1="12" x2="9" y2="12" />
-      </svg>
-    );
+      const LogoutIcon = () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      );
 
-    const CheckIcon = () => (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-    );
+      const CheckIcon = () => (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      );
 
-    const ClockIcon = () => (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-      </svg>
-    );
+      const ClockIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      );
 
-    const LockIcon = () => (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-      </svg>
-    );
+      const LockIcon = () => (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+      );
 
-    const DocumentIcon = () => (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-      </svg>
-    );
+      const DocumentIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      );
 
-    const QuizIcon = () => (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-        <line x1="12" y1="17" x2="12.01" y2="17" />
-      </svg>
-    );
+      const QuizIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      );
 
-    const SparklesIcon = () => (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" />
-        <path d="M5 19l.5 1.5L7 21l-1.5.5L5 23l-.5-1.5L3 21l1.5-.5L5 19z" />
-        <path d="M19 13l.5 1.5L21 15l-1.5.5L19 17l-.5-1.5L17 15l1.5-.5L19 13z" />
-      </svg>
-    );
+      const SparklesIcon = () => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" />
+          <path d="M5 19l.5 1.5L7 21l-1.5.5L5 23l-.5-1.5L3 21l1.5-.5L5 19z" />
+          <path d="M19 13l.5 1.5L21 15l-1.5.5L19 17l-.5-1.5L17 15l1.5-.5L19 13z" />
+        </svg>
+      );
 
-    const ChevronIcon = ({ expanded }) => (
-      <svg 
-        width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-        style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
-      >
-        <polyline points="6 9 12 15 18 9" />
-      </svg>
-    );
+      const ChevronIcon = ({ expanded }) => (
+        <svg 
+          width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      );
 
-    const SelfCompleteIcon = () => (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-        <polyline points="22 4 12 14.01 9 11.01" />
-      </svg>
-    );
+      const SelfCompleteIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      );
 
-    const LoadingSpinner = () => (
-      <svg className="loading-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M21 12a9 9 0 11-6.219-8.56" />
-      </svg>
-    );
+      const LoadingSpinner = () => (
+        <svg className="loading-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21 12a9 9 0 11-6.219-8.56" />
+        </svg>
+      );
 
-    const PlusIcon = () => (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <line x1="12" y1="5" x2="12" y2="19" />
-        <line x1="5" y1="12" x2="19" y2="12" />
-      </svg>
-    );
+      const PlusIcon = () => (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      );
 
-    const EditIcon = () => (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-      </svg>
-    );
+      const EditIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+      );
 
-    const DeleteIcon = () => (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <polyline points="3 6 5 6 21 6" />
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      </svg>
-    );
+      const DeleteIcon = () => (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        </svg>
+      );
 
-    // =============================================
-    // Training Task Component
-    // =============================================
-    const TrainingTask = ({ task, isCompleted, onToggleComplete, onEdit, onDelete, isAdmin }) => {
-      const [loading, setLoading] = useState(false);
+      // =============================================
+      // Training Task Component
+      // =============================================
+      const TrainingTask = ({ task, isCompleted, onToggleComplete, onEdit, onDelete, isAdmin }) => {
+        const [loading, setLoading] = useState(false);
 
-      const handleToggle = async () => {
-        setLoading(true);
-        await onToggleComplete(task.id);
-        setLoading(false);
+        const handleToggle = async () => {
+          setLoading(true);
+          await onToggleComplete(task.id);
+          setLoading(false);
+        };
+
+        return (
+          <div style={{
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '12px',
+            border: '1px solid #e8e8e8',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
+                <div 
+                  onClick={handleToggle}
+                  style={{
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '50%',
+                    backgroundColor: isCompleted ? '#10b981' : 'transparent',
+                    border: isCompleted ? 'none' : '2px solid #d1d5db',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: '2px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {loading ? <LoadingSpinner /> : isCompleted && <CheckIcon />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: '15px',
+                    fontWeight: '500',
+                    color: '#1f2937',
+                    lineHeight: '1.5',
+                    marginBottom: '8px',
+                    textDecoration: isCompleted ? 'line-through' : 'none',
+                    opacity: isCompleted ? 0.7 : 1
+                  }}>
+                    {task.title}
+                  </div>
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    {task.materials_count > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#6b7280', fontSize: '13px' }}>
+                        <DocumentIcon />
+                        <span>{task.materials_count} 份资料</span>
+                      </div>
+                    )}
+                    {task.quiz_count > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f97316', fontSize: '13px' }}>
+                        <QuizIcon />
+                        <span>{task.quiz_count} 题考核</span>
+                      </div>
+                    )}
+                    {task.is_self_complete && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontSize: '13px' }}>
+                        <SelfCompleteIcon />
+                        <span>自主完成</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {isAdmin && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => onEdit(task)}
+                    style={{
+                      padding: '6px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: '#f3f4f6',
+                      cursor: 'pointer',
+                      color: '#6b7280'
+                    }}
+                  >
+                    <EditIcon />
+                  </button>
+                  <button
+                    onClick={() => onDelete(task.id)}
+                    style={{
+                      padding: '6px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: '#fef2f2',
+                      cursor: 'pointer',
+                      color: '#ef4444'
+                    }}
+                  >
+                    <DeleteIcon />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
       };
 
-      return (
-        <div style={{
-          backgroundColor: '#fff',
-          borderRadius: '12px',
-          padding: '16px 20px',
-          marginBottom: '12px',
-          border: '1px solid #e8e8e8',
-          transition: 'all 0.2s ease',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
-              <div 
-                onClick={handleToggle}
-                style={{
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '50%',
-                  backgroundColor: isCompleted ? '#10b981' : 'transparent',
-                  border: isCompleted ? 'none' : '2px solid #d1d5db',
+      // =============================================
+      // Day Module Component
+      // =============================================
+      const DayModule = ({ module, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, isAdmin }) => {
+        const [isExpanded, setIsExpanded] = useState(true);
+
+        return (
+          <div style={{ marginBottom: '24px' }}>
+            <div 
+              onClick={() => setIsExpanded(!isExpanded)}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px',
+                marginBottom: '16px',
+                cursor: 'pointer'
+              }}
+            >
+              <div style={{
+                backgroundColor: '#0d9488',
+                color: 'white',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                D{module.day_number}
+              </div>
+              <h3 style={{ fontSize: '17px', fontWeight: '600', color: '#1f2937', margin: 0, flex: 1 }}>
+                {module.title}
+              </h3>
+              {module.is_fixed && (
+                <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  marginTop: '2px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  gap: '4px',
+                  backgroundColor: '#f3f4f6',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  color: '#6b7280'
+                }}>
+                  <LockIcon />
+                  <span>固定课程</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#9ca3af', fontSize: '13px' }}>
+                <ClockIcon />
+                <span>{module.duration}</span>
+              </div>
+              <ChevronIcon expanded={isExpanded} />
+            </div>
+            
+            {isExpanded && (
+              <div style={{ marginLeft: '4px' }}>
+                {module.training_tasks?.map((task) => {
+                  const progress = userProgress?.find(p => p.task_id === task.id);
+                  return (
+                    <TrainingTask
+                      key={task.id}
+                      task={task}
+                      isCompleted={progress?.is_completed || false}
+                      onToggleComplete={onToggleComplete}
+                      onEdit={onEditTask}
+                      onDelete={onDeleteTask}
+                      isAdmin={isAdmin}
+                    />
+                  );
+                })}
+                {isAdmin && (
+                  <button
+                    onClick={() => onAddTask(module.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: '2px dashed #d1d5db',
+                      backgroundColor: 'transparent',
+                      color: '#6b7280',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      width: '100%',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <PlusIcon />
+                    添加任务
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // =============================================
+      // Task Edit Modal
+      // =============================================
+      const TaskModal = ({ task, moduleId, onSave, onClose }) => {
+        const [formData, setFormData] = useState({
+          title: task?.title || '',
+          materials_count: task?.materials_count || 0,
+          quiz_count: task?.quiz_count || 0,
+          is_self_complete: task?.is_self_complete || false
+        });
+        const [saving, setSaving] = useState(false);
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          setSaving(true);
+          await onSave({
+            ...formData,
+            id: task?.id,
+            module_id: moduleId
+          });
+          setSaving(false);
+          onClose();
+        };
+
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '500px',
+              maxWidth: '90vw'
+            }}>
+              <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '600' }}>
+                {task ? '编辑任务' : '添加任务'}
+              </h3>
+              <form onSubmit={handleSubmit}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
+                    任务标题
+                  </label>
+                  <textarea
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '14px',
+                      minHeight: '80px',
+                      resize: 'vertical',
+                      boxSizing: 'border-box'
+                    }}
+                    required
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
+                      资料数量
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.materials_count}
+                      onChange={(e) => setFormData({ ...formData, materials_count: parseInt(e.target.value) || 0 })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
+                      考核题数
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.quiz_count}
+                      onChange={(e) => setFormData({ ...formData, quiz_count: parseInt(e.target.value) || 0 })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={formData.is_self_complete}
+                      onChange={(e) => setFormData({ ...formData, is_self_complete: e.target.checked })}
+                      style={{ width: '16px', height: '16px' }}
+                    />
+                    <span style={{ fontSize: '14px' }}>自主完成任务</span>
+                  </label>
+                </div>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      backgroundColor: 'white',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: '#0d9488',
+                      color: 'white',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      opacity: saving ? 0.7 : 1
+                    }}
+                  >
+                    {saving ? '保存中...' : '保存'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      };
+
+      // =============================================
+      // Main App Component
+      // =============================================
+      function KiwiTrainAI() {
+        const [activeNav, setActiveNav] = useState('training');
+        const [departments, setDepartments] = useState([]);
+        const [selectedDepartment, setSelectedDepartment] = useState(null);
+        const [trainingModules, setTrainingModules] = useState([]);
+        const [userProgress, setUserProgress] = useState([]);
+        const [currentUser, setCurrentUser] = useState(null);
+        const [loading, setLoading] = useState(true);
+        const [error, setError] = useState(null);
+        const [modalState, setModalState] = useState({ open: false, task: null, moduleId: null });
+
+        const isAdmin = currentUser?.role === 'admin';
+
+        const navItems = [
+          { id: 'dashboard', label: '总览 Dashboard', icon: DashboardIcon },
+          { id: 'training', label: '培训计划 Training', icon: TrainingIcon },
+          { id: 'roleplay', label: 'AI 陪练 Role-Play', icon: RolePlayIcon },
+          { id: 'resources', label: '资料库 Resources', icon: ResourcesIcon },
+          { id: 'users', label: '账号管理 Users', icon: UsersIcon },
+        ];
+
+        // Fetch departments
+        const fetchDepartments = async () => {
+          console.log('Fetching departments...');
+          const { data, error } = await supabaseClient
+            .from('departments')
+            .select('*')
+            .order('sort_order');
+          
+          console.log('Departments result:', data, error);
+          
+          if (error) {
+            setError('获取部门数据失败: ' + error.message);
+            return;
+          }
+          
+          if (data && data.length > 0) {
+            setDepartments(data);
+            setSelectedDepartment(data[0]);
+          }
+        };
+
+        // Fetch training modules for selected department
+        const fetchTrainingModules = async () => {
+          if (!selectedDepartment) return;
+
+          console.log('Fetching modules for department:', selectedDepartment.id);
+          
+          const { data, error } = await supabaseClient
+            .from('training_modules')
+            .select(`
+              *,
+              training_tasks(*)
+            `)
+            .eq('department_id', selectedDepartment.id)
+            .order('sort_order');
+
+          console.log('Modules result:', data, error);
+
+          if (error) {
+            setError('获取培训模块失败: ' + error.message);
+            return;
+          }
+
+          if (data) {
+            const sortedData = data.map(module => ({
+              ...module,
+              training_tasks: module.training_tasks?.sort((a, b) => a.sort_order - b.sort_order) || []
+            }));
+            setTrainingModules(sortedData);
+          }
+        };
+
+        // Toggle task completion
+        const handleToggleComplete = async (taskId) => {
+          if (!currentUser) return;
+
+          const existing = userProgress.find(p => p.task_id === taskId);
+          const newStatus = !existing?.is_completed;
+
+          if (existing) {
+            await supabaseClient
+              .from('user_task_progress')
+              .update({ 
+                is_completed: newStatus, 
+                completed_at: newStatus ? new Date().toISOString() : null 
+              })
+              .eq('id', existing.id);
+          } else {
+            await supabaseClient
+              .from('user_task_progress')
+              .insert({
+                user_id: currentUser.id,
+                task_id: taskId,
+                is_completed: true,
+                completed_at: new Date().toISOString()
+              });
+          }
+
+          // Refresh progress
+          const { data } = await supabaseClient
+            .from('user_task_progress')
+            .select('*')
+            .eq('user_id', currentUser.id);
+          
+          if (data) setUserProgress(data);
+        };
+
+        // Save task (create or update)
+        const handleSaveTask = async (taskData) => {
+          if (taskData.id) {
+            await supabaseClient
+              .from('training_tasks')
+              .update({
+                title: taskData.title,
+                materials_count: taskData.materials_count,
+                quiz_count: taskData.quiz_count,
+                is_self_complete: taskData.is_self_complete
+              })
+              .eq('id', taskData.id);
+          } else {
+            const { data: existingTasks } = await supabaseClient
+              .from('training_tasks')
+              .select('sort_order')
+              .eq('module_id', taskData.module_id)
+              .order('sort_order', { ascending: false })
+              .limit(1);
+
+            const nextOrder = (existingTasks?.[0]?.sort_order || 0) + 1;
+
+            await supabaseClient
+              .from('training_tasks')
+              .insert({
+                module_id: taskData.module_id,
+                title: taskData.title,
+                materials_count: taskData.materials_count,
+                quiz_count: taskData.quiz_count,
+                is_self_complete: taskData.is_self_complete,
+                sort_order: nextOrder
+              });
+          }
+
+          await fetchTrainingModules();
+        };
+
+        // Delete task
+        const handleDeleteTask = async (taskId) => {
+          if (!confirm('确定要删除这个任务吗？')) return;
+
+          await supabaseClient
+            .from('training_tasks')
+            .delete()
+            .eq('id', taskId);
+
+          await fetchTrainingModules();
+        };
+
+        // Initialize
+        useEffect(() => {
+          const initialize = async () => {
+            setLoading(true);
+            
+            // Demo admin user
+            setCurrentUser({
+              id: 'demo-user-id',
+              name: '管理员',
+              role: 'admin',
+              email: 'admin@kiwi.com'
+            });
+
+            await fetchDepartments();
+            setLoading(false);
+          };
+
+          initialize();
+        }, []);
+
+        useEffect(() => {
+          if (selectedDepartment) {
+            fetchTrainingModules();
+          }
+        }, [selectedDepartment]);
+
+        const handleLogout = async () => {
+          await supabaseClient.auth.signOut();
+          setCurrentUser(null);
+        };
+
+        if (loading) {
+          return (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100vh',
+              backgroundColor: '#f8fafa',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <LoadingSpinner />
+              <span style={{ color: '#6b7280' }}>加载中...</span>
+            </div>
+          );
+        }
+
+        if (error) {
+          return (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100vh',
+              backgroundColor: '#f8fafa',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ color: '#ef4444', fontSize: '18px' }}>❌ 错误</div>
+              <div style={{ color: '#6b7280' }}>{error}</div>
+              <button 
+                onClick={() => window.location.reload()}
+                style={{
+                  marginTop: '12px',
+                  padding: '10px 20px',
+                  backgroundColor: '#0d9488',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
                 }}
               >
-                {loading ? <LoadingSpinner /> : isCompleted && <CheckIcon />}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{
-                  fontSize: '15px',
-                  fontWeight: '500',
-                  color: '#1f2937',
-                  lineHeight: '1.5',
-                  marginBottom: '8px',
-                  textDecoration: isCompleted ? 'line-through' : 'none',
-                  opacity: isCompleted ? 0.7 : 1
-                }}>
-                  {task.title}
-                </div>
-                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                  {task.materials_count > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#6b7280', fontSize: '13px' }}>
-                      <DocumentIcon />
-                      <span>{task.materials_count} 份资料</span>
-                    </div>
-                  )}
-                  {task.quiz_count > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f97316', fontSize: '13px' }}>
-                      <QuizIcon />
-                      <span>{task.quiz_count} 题考核</span>
-                    </div>
-                  )}
-                  {task.is_self_complete && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontSize: '13px' }}>
-                      <SelfCompleteIcon />
-                      <span>自主完成</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                重新加载
+              </button>
             </div>
-            {isAdmin && (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => onEdit(task)}
-                  style={{
-                    padding: '6px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#f3f4f6',
-                    cursor: 'pointer',
-                    color: '#6b7280'
-                  }}
-                >
-                  <EditIcon />
-                </button>
-                <button
-                  onClick={() => onDelete(task.id)}
-                  style={{
-                    padding: '6px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#fef2f2',
-                    cursor: 'pointer',
-                    color: '#ef4444'
-                  }}
-                >
-                  <DeleteIcon />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    };
+          );
+        }
 
-    // =============================================
-    // Day Module Component
-    // =============================================
-    const DayModule = ({ module, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, isAdmin }) => {
-      const [isExpanded, setIsExpanded] = useState(true);
-
-      return (
-        <div style={{ marginBottom: '24px' }}>
-          <div 
-            onClick={() => setIsExpanded(!isExpanded)}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px',
-              marginBottom: '16px',
-              cursor: 'pointer'
-            }}
-          >
+        return (
+          <div style={{
+            display: 'flex',
+            minHeight: '100vh',
+            backgroundColor: '#f8fafa'
+          }}>
+            {/* Sidebar */}
             <div style={{
-              backgroundColor: '#0d9488',
-              color: 'white',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '600'
+              width: '260px',
+              backgroundColor: '#ffffff',
+              borderRight: '1px solid #e5e7eb',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'fixed',
+              height: '100vh',
+              zIndex: 100
             }}>
-              D{module.day_number}
-            </div>
-            <h3 style={{ fontSize: '17px', fontWeight: '600', color: '#1f2937', margin: 0, flex: 1 }}>
-              {module.title}
-            </h3>
-            {module.is_fixed && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                backgroundColor: '#f3f4f6',
-                padding: '4px 10px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                color: '#6b7280'
-              }}>
-                <LockIcon />
-                <span>固定课程</span>
+              {/* Logo */}
+              <div style={{ padding: '24px 20px', borderBottom: '1px solid #f3f4f6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(13, 148, 136, 0.3)'
+                  }}>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                      <path d="M2 17l10 5 10-5" />
+                      <path d="M2 12l10 5 10-5" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#0d9488', letterSpacing: '-0.5px' }}>
+                      KiwiTrain AI
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+                      柯维留学事务所培训系统
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#9ca3af', fontSize: '13px' }}>
-              <ClockIcon />
-              <span>{module.duration}</span>
-            </div>
-            <ChevronIcon expanded={isExpanded} />
-          </div>
-          
-          {isExpanded && (
-            <div style={{ marginLeft: '4px' }}>
-              {module.training_tasks?.map((task) => {
-                const progress = userProgress?.find(p => p.task_id === task.id);
-                return (
-                  <TrainingTask
-                    key={task.id}
-                    task={task}
-                    isCompleted={progress?.is_completed || false}
-                    onToggleComplete={onToggleComplete}
-                    onEdit={onEditTask}
-                    onDelete={onDeleteTask}
-                    isAdmin={isAdmin}
-                  />
-                );
-              })}
-              {isAdmin && (
-                <button
-                  onClick={() => onAddTask(module.id)}
+
+              {/* Navigation */}
+              <nav style={{ padding: '16px 12px', flex: 1 }}>
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeNav === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setActiveNav(item.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 14px',
+                        borderRadius: '10px',
+                        marginBottom: '4px',
+                        cursor: 'pointer',
+                        backgroundColor: isActive ? '#f0fdfa' : 'transparent',
+                        color: isActive ? '#0d9488' : '#6b7280',
+                        fontWeight: isActive ? '600' : '500',
+                        fontSize: '14px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Icon />
+                      <span>{item.label}</span>
+                    </div>
+                  );
+                })}
+              </nav>
+
+              {/* User Info */}
+              <div style={{ padding: '16px 20px', borderTop: '1px solid #f3f4f6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    backgroundColor: '#0d9488',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: '600',
+                    fontSize: '16px'
+                  }}>
+                    {currentUser?.name?.[0] || 'A'}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
+                      {currentUser?.name || '管理员'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+                      {currentUser?.role === 'admin' ? '管理层' : '员工'}
+                    </div>
+                  </div>
+                </div>
+                
+                <div
+                  onClick={handleLogout}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    border: '2px dashed #d1d5db',
-                    backgroundColor: 'transparent',
-                    color: '#6b7280',
+                    color: '#ef4444',
                     fontSize: '14px',
                     cursor: 'pointer',
-                    width: '100%',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s ease'
+                    padding: '8px 0'
                   }}
                 >
-                  <PlusIcon />
-                  添加任务
-                </button>
-              )}
+                  <LogoutIcon />
+                  <span>退出登录</span>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      );
-    };
 
-    // =============================================
-    // Task Edit Modal
-    // =============================================
-    const TaskModal = ({ task, moduleId, onSave, onClose }) => {
-      const [formData, setFormData] = useState({
-        title: task?.title || '',
-        materials_count: task?.materials_count || 0,
-        quiz_count: task?.quiz_count || 0,
-        is_self_complete: task?.is_self_complete || false
-      });
-      const [saving, setSaving] = useState(false);
-
-      const handleSubmit = async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        await onSave({
-          ...formData,
-          id: task?.id,
-          module_id: moduleId
-        });
-        setSaving(false);
-        onClose();
-      };
-
-      return (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '16px',
-            padding: '24px',
-            width: '500px',
-            maxWidth: '90vw'
-          }}>
-            <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '600' }}>
-              {task ? '编辑任务' : '添加任务'}
-            </h3>
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
-                  任务标题
-                </label>
-                <textarea
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '14px',
-                    minHeight: '80px',
-                    resize: 'vertical',
-                    boxSizing: 'border-box'
-                  }}
-                  required
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
-                    资料数量
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.materials_count}
-                    onChange={(e) => setFormData({ ...formData, materials_count: parseInt(e.target.value) || 0 })}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '14px',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+            {/* Main Content */}
+            <div style={{ flex: 1, marginLeft: '260px', padding: '32px 40px' }}>
+              {/* Header */}
+              <div style={{ marginBottom: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <SparklesIcon />
+                  <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937', margin: 0 }}>
+                    智能培训计划生成器 {isAdmin && '(管理员)'}
+                  </h1>
                 </div>
+                <p style={{ fontSize: '15px', color: '#6b7280', margin: 0 }}>
+                  {isAdmin 
+                    ? '作为管理员，您可以直接编辑各部门的培训内容，更改将即时生效。'
+                    : '完成以下培训任务，开始你的职业之旅。'}
+                </p>
+              </div>
+
+              {/* Content Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '32px' }}>
+                {/* Department Selection */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
-                    考核题数
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.quiz_count}
-                    onChange={(e) => setFormData({ ...formData, quiz_count: parseInt(e.target.value) || 0 })}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '14px',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
+                    目标部门 / 岗位
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {departments.map((dept) => (
+                      <div
+                        key={dept.id}
+                        onClick={() => setSelectedDepartment(dept)}
+                        style={{
+                          padding: '14px 18px',
+                          borderRadius: '10px',
+                          border: selectedDepartment?.id === dept.id 
+                            ? '2px solid #14b8a6' 
+                            : '1px solid #e5e7eb',
+                          backgroundColor: selectedDepartment?.id === dept.id 
+                            ? '#f0fdfa' 
+                            : '#ffffff',
+                          color: selectedDepartment?.id === dept.id 
+                            ? '#0d9488' 
+                            : '#374151',
+                          fontWeight: selectedDepartment?.id === dept.id ? '600' : '500',
+                          fontSize: '15px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {dept.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Training Schedule */}
+                <div>
+                  <h2 style={{
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '24px',
+                    paddingBottom: '16px',
+                    borderBottom: '2px solid #e5e7eb'
+                  }}>
+                    {selectedDepartment?.name || ''} - 入职培训日程
+                  </h2>
+
+                  {trainingModules.length === 0 ? (
+                    <div style={{
+                      textAlign: 'center',
+                      padding: '60px 20px',
+                      color: '#9ca3af'
+                    }}>
+                      <p>暂无培训内容</p>
+                    </div>
+                  ) : (
+                    trainingModules.map((module) => (
+                      <DayModule
+                        key={module.id}
+                        module={module}
+                        userProgress={userProgress}
+                        onToggleComplete={handleToggleComplete}
+                        onEditTask={(task) => setModalState({ open: true, task, moduleId: module.id })}
+                        onDeleteTask={handleDeleteTask}
+                        onAddTask={(moduleId) => setModalState({ open: true, task: null, moduleId })}
+                        isAdmin={isAdmin}
+                      />
+                    ))
+                  )}
                 </div>
               </div>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={formData.is_self_complete}
-                    onChange={(e) => setFormData({ ...formData, is_self_complete: e.target.checked })}
-                    style={{ width: '16px', height: '16px' }}
-                  />
-                  <span style={{ fontSize: '14px' }}>自主完成任务</span>
-                </label>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    border: '1px solid #d1d5db',
-                    backgroundColor: 'white',
-                    fontSize: '14px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: '#0d9488',
-                    color: 'white',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    opacity: saving ? 0.7 : 1
-                  }}
-                >
-                  {saving ? '保存中...' : '保存'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      );
-    };
+            </div>
 
-    // =============================================
-    // Main App Component
-    // =============================================
-    function KiwiTrainAI() {
-      const [activeNav, setActiveNav] = useState('training');
-      const [departments, setDepartments] = useState([]);
-      const [selectedDepartment, setSelectedDepartment] = useState(null);
-      const [trainingModules, setTrainingModules] = useState([]);
-      const [userProgress, setUserProgress] = useState([]);
-      const [currentUser, setCurrentUser] = useState(null);
-      const [loading, setLoading] = useState(true);
-      const [modalState, setModalState] = useState({ open: false, task: null, moduleId: null });
-
-      const isAdmin = currentUser?.role === 'admin';
-
-      const navItems = [
-        { id: 'dashboard', label: '总览 Dashboard', icon: DashboardIcon },
-        { id: 'training', label: '培训计划 Training', icon: TrainingIcon },
-        { id: 'roleplay', label: 'AI 陪练 Role-Play', icon: RolePlayIcon },
-        { id: 'resources', label: '资料库 Resources', icon: ResourcesIcon },
-        { id: 'users', label: '账号管理 Users', icon: UsersIcon },
-      ];
-
-      // Fetch departments
-      const fetchDepartments = useCallback(async () => {
-        const { data, error } = await supabase
-          .from('departments')
-          .select('*')
-          .order('sort_order');
-        
-        if (!error && data) {
-          setDepartments(data);
-          if (data.length > 0 && !selectedDepartment) {
-            setSelectedDepartment(data[0]);
-          }
-        }
-      }, []);
-
-      // Fetch training modules for selected department
-      const fetchTrainingModules = useCallback(async () => {
-        if (!selectedDepartment) return;
-
-        const { data, error } = await supabase
-          .from('training_modules')
-          .select(`
-            *,
-            training_tasks(*)
-          `)
-          .eq('department_id', selectedDepartment.id)
-          .order('sort_order');
-
-        if (!error && data) {
-          // Sort tasks within each module
-          const sortedData = data.map(module => ({
-            ...module,
-            training_tasks: module.training_tasks?.sort((a, b) => a.sort_order - b.sort_order) || []
-          }));
-          setTrainingModules(sortedData);
-        }
-      }, [selectedDepartment]);
-
-      // Fetch user progress
-      const fetchUserProgress = useCallback(async () => {
-        if (!currentUser) return;
-
-        const { data, error } = await supabase
-          .from('user_task_progress')
-          .select('*')
-          .eq('user_id', currentUser.id);
-
-        if (!error && data) {
-          setUserProgress(data);
-        }
-      }, [currentUser]);
-
-      // Toggle task completion
-      const handleToggleComplete = async (taskId) => {
-        if (!currentUser) return;
-
-        const existing = userProgress.find(p => p.task_id === taskId);
-        const newStatus = !existing?.is_completed;
-
-        if (existing) {
-          await supabase
-            .from('user_task_progress')
-            .update({ 
-              is_completed: newStatus, 
-              completed_at: newStatus ? new Date().toISOString() : null 
-            })
-            .eq('id', existing.id);
-        } else {
-          await supabase
-            .from('user_task_progress')
-            .insert({
-              user_id: currentUser.id,
-              task_id: taskId,
-              is_completed: true,
-              completed_at: new Date().toISOString()
-            });
-        }
-
-        await fetchUserProgress();
-      };
-
-      // Save task (create or update)
-      const handleSaveTask = async (taskData) => {
-        if (taskData.id) {
-          await supabase
-            .from('training_tasks')
-            .update({
-              title: taskData.title,
-              materials_count: taskData.materials_count,
-              quiz_count: taskData.quiz_count,
-              is_self_complete: taskData.is_self_complete
-            })
-            .eq('id', taskData.id);
-        } else {
-          const { data: existingTasks } = await supabase
-            .from('training_tasks')
-            .select('sort_order')
-            .eq('module_id', taskData.module_id)
-            .order('sort_order', { ascending: false })
-            .limit(1);
-
-          const nextOrder = (existingTasks?.[0]?.sort_order || 0) + 1;
-
-          await supabase
-            .from('training_tasks')
-            .insert({
-              module_id: taskData.module_id,
-              title: taskData.title,
-              materials_count: taskData.materials_count,
-              quiz_count: taskData.quiz_count,
-              is_self_complete: taskData.is_self_complete,
-              sort_order: nextOrder
-            });
-        }
-
-        await fetchTrainingModules();
-      };
-
-      // Delete task
-      const handleDeleteTask = async (taskId) => {
-        if (!confirm('确定要删除这个任务吗？')) return;
-
-        await supabase
-          .from('training_tasks')
-          .delete()
-          .eq('id', taskId);
-
-        await fetchTrainingModules();
-      };
-
-      // Initialize
-      useEffect(() => {
-        const initialize = async () => {
-          setLoading(true);
-          
-          // Demo admin user
-          setCurrentUser({
-            id: 'demo-user-id',
-            name: '管理员',
-            role: 'admin',
-            email: 'admin@kiwi.com'
-          });
-
-          await fetchDepartments();
-          setLoading(false);
-        };
-
-        initialize();
-      }, []);
-
-      useEffect(() => {
-        if (selectedDepartment) {
-          fetchTrainingModules();
-        }
-      }, [selectedDepartment, fetchTrainingModules]);
-
-      useEffect(() => {
-        if (currentUser) {
-          fetchUserProgress();
-        }
-      }, [currentUser, fetchUserProgress]);
-
-      const handleLogout = async () => {
-        await supabase.auth.signOut();
-        setCurrentUser(null);
-      };
-
-      if (loading) {
-        return (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100vh',
-            backgroundColor: '#f8fafa'
-          }}>
-            <LoadingSpinner />
-            <span style={{ marginLeft: '12px', color: '#6b7280' }}>加载中...</span>
+            {/* Task Modal */}
+            {modalState.open && (
+              <TaskModal
+                task={modalState.task}
+                moduleId={modalState.moduleId}
+                onSave={handleSaveTask}
+                onClose={() => setModalState({ open: false, task: null, moduleId: null })}
+              />
+            )}
           </div>
         );
       }
 
-      return (
-        <div style={{
-          display: 'flex',
-          minHeight: '100vh',
-          backgroundColor: '#f8fafa'
-        }}>
-          {/* Sidebar */}
-          <div style={{
-            width: '260px',
-            backgroundColor: '#ffffff',
-            borderRight: '1px solid #e5e7eb',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'fixed',
-            height: '100vh',
-            zIndex: 100
-          }}>
-            {/* Logo */}
-            <div style={{ padding: '24px 20px', borderBottom: '1px solid #f3f4f6' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(13, 148, 136, 0.3)'
-                }}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: '18px', fontWeight: '700', color: '#0d9488', letterSpacing: '-0.5px' }}>
-                    KiwiTrain AI
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
-                    柯维留学事务所培训系统
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Navigation */}
-            <nav style={{ padding: '16px 12px', flex: 1 }}>
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeNav === item.id;
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => setActiveNav(item.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '12px 14px',
-                      borderRadius: '10px',
-                      marginBottom: '4px',
-                      cursor: 'pointer',
-                      backgroundColor: isActive ? '#f0fdfa' : 'transparent',
-                      color: isActive ? '#0d9488' : '#6b7280',
-                      fontWeight: isActive ? '600' : '500',
-                      fontSize: '14px',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <Icon />
-                    <span>{item.label}</span>
-                  </div>
-                );
-              })}
-            </nav>
-
-            {/* User Info */}
-            <div style={{ padding: '16px 20px', borderTop: '1px solid #f3f4f6' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  backgroundColor: '#0d9488',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: '600',
-                  fontSize: '16px'
-                }}>
-                  {currentUser?.name?.[0] || 'A'}
-                </div>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
-                    {currentUser?.name || '管理员'}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#9ca3af' }}>
-                    {currentUser?.role === 'admin' ? '管理层' : '员工'}
-                  </div>
-                </div>
-              </div>
-              
-              <div
-                onClick={handleLogout}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: '#ef4444',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  padding: '8px 0'
-                }}
-              >
-                <LogoutIcon />
-                <span>退出登录</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Content */}
-          <div style={{ flex: 1, marginLeft: '260px', padding: '32px 40px' }}>
-            {/* Header */}
-            <div style={{ marginBottom: '32px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <SparklesIcon />
-                <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937', margin: 0 }}>
-                  智能培训计划生成器 {isAdmin && '(管理员)'}
-                </h1>
-              </div>
-              <p style={{ fontSize: '15px', color: '#6b7280', margin: 0 }}>
-                {isAdmin 
-                  ? '作为管理员，您可以直接编辑各部门的培训内容，更改将即时生效。'
-                  : '完成以下培训任务，开始你的职业之旅。'}
-              </p>
-            </div>
-
-            {/* Content Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '32px' }}>
-              {/* Department Selection */}
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
-                  目标部门 / 岗位
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {departments.map((dept) => (
-                    <div
-                      key={dept.id}
-                      onClick={() => setSelectedDepartment(dept)}
-                      style={{
-                        padding: '14px 18px',
-                        borderRadius: '10px',
-                        border: selectedDepartment?.id === dept.id 
-                          ? '2px solid #14b8a6' 
-                          : '1px solid #e5e7eb',
-                        backgroundColor: selectedDepartment?.id === dept.id 
-                          ? '#f0fdfa' 
-                          : '#ffffff',
-                        color: selectedDepartment?.id === dept.id 
-                          ? '#0d9488' 
-                          : '#374151',
-                        fontWeight: selectedDepartment?.id === dept.id ? '600' : '500',
-                        fontSize: '15px',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      {dept.name}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Training Schedule */}
-              <div>
-                <h2 style={{
-                  fontSize: '20px',
-                  fontWeight: '700',
-                  color: '#1f2937',
-                  marginBottom: '24px',
-                  paddingBottom: '16px',
-                  borderBottom: '2px solid #e5e7eb'
-                }}>
-                  {selectedDepartment?.name || ''} - 入职培训日程
-                </h2>
-
-                {trainingModules.length === 0 ? (
-                  <div style={{
-                    textAlign: 'center',
-                    padding: '60px 20px',
-                    color: '#9ca3af'
-                  }}>
-                    <p>暂无培训内容</p>
-                  </div>
-                ) : (
-                  trainingModules.map((module) => (
-                    <DayModule
-                      key={module.id}
-                      module={module}
-                      userProgress={userProgress}
-                      onToggleComplete={handleToggleComplete}
-                      onEditTask={(task) => setModalState({ open: true, task, moduleId: module.id })}
-                      onDeleteTask={handleDeleteTask}
-                      onAddTask={(moduleId) => setModalState({ open: true, task: null, moduleId })}
-                      isAdmin={isAdmin}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Task Modal */}
-          {modalState.open && (
-            <TaskModal
-              task={modalState.task}
-              moduleId={modalState.moduleId}
-              onSave={handleSaveTask}
-              onClose={() => setModalState({ open: false, task: null, moduleId: null })}
-            />
-          )}
-        </div>
-      );
-    }
-
-    // =============================================
-    // Render App
-    // =============================================
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<KiwiTrainAI />);
+      // =============================================
+      // Render App
+      // =============================================
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<KiwiTrainAI />);
+    };
   </script>
 </body>
 </html>
