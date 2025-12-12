@@ -1112,6 +1112,264 @@ D. 服务
         );
       };
 
+      // ==================== PROFILE PAGE ====================
+      const ProfilePage = ({ currentUser, supabase, onUserUpdate, departments }) => {
+        const [activeTab, setActiveTab] = useState('info');
+        const [form, setForm] = useState({
+          name: currentUser?.name || '',
+          email: currentUser?.email || '',
+          phone: currentUser?.phone || '',
+        });
+        const [passwordForm, setPasswordForm] = useState({
+          oldPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+        const [saving, setSaving] = useState(false);
+        const [message, setMessage] = useState({ type: '', text: '' });
+        const [uploading, setUploading] = useState(false);
+
+        const userDept = departments?.find(d => d.id === currentUser?.department_id);
+
+        // Handle avatar upload
+        const handleAvatarUpload = async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+
+          // Validate file type
+          if (!file.type.startsWith('image/')) {
+            setMessage({ type: 'error', text: '请上传图片文件' });
+            return;
+          }
+
+          // Validate file size (max 2MB)
+          if (file.size > 2 * 1024 * 1024) {
+            setMessage({ type: 'error', text: '图片大小不能超过 2MB' });
+            return;
+          }
+
+          setUploading(true);
+          setMessage({ type: '', text: '' });
+
+          try {
+            // Upload to Supabase Storage
+            const ext = file.name.split('.').pop();
+            const path = `avatars/${currentUser.id}_${Date.now()}.${ext}`;
+            
+            const { data, error: uploadError } = await supabase.storage
+              .from('resources')
+              .upload(path, file, { upsert: true });
+
+            if (uploadError) throw uploadError;
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+              .from('resources')
+              .getPublicUrl(path);
+
+            // Update user record
+            const { error: updateError } = await supabase
+              .from('users')
+              .update({ avatar_url: publicUrl })
+              .eq('id', currentUser.id);
+
+            if (updateError) throw updateError;
+
+            onUserUpdate({ ...currentUser, avatar_url: publicUrl });
+            setMessage({ type: 'success', text: '头像上传成功' });
+          } catch (err) {
+            setMessage({ type: 'error', text: '上传失败：' + err.message });
+          } finally {
+            setUploading(false);
+          }
+        };
+
+        // Handle profile update
+        const handleSaveProfile = async (e) => {
+          e.preventDefault();
+          if (!form.name.trim()) {
+            setMessage({ type: 'error', text: '姓名不能为空' });
+            return;
+          }
+
+          setSaving(true);
+          setMessage({ type: '', text: '' });
+
+          try {
+            const { error } = await supabase
+              .from('users')
+              .update({ 
+                name: form.name.trim(),
+                phone: form.phone?.trim() || null
+              })
+              .eq('id', currentUser.id);
+
+            if (error) throw error;
+
+            onUserUpdate({ ...currentUser, name: form.name.trim(), phone: form.phone?.trim() });
+            setMessage({ type: 'success', text: '个人信息已更新' });
+          } catch (err) {
+            setMessage({ type: 'error', text: '保存失败：' + err.message });
+          } finally {
+            setSaving(false);
+          }
+        };
+
+        // Handle password change
+        const handleChangePassword = async (e) => {
+          e.preventDefault();
+          setMessage({ type: '', text: '' });
+
+          if (passwordForm.oldPassword !== currentUser.password) {
+            setMessage({ type: 'error', text: '当前密码错误' });
+            return;
+          }
+
+          if (passwordForm.newPassword.length < 6) {
+            setMessage({ type: 'error', text: '新密码至少6位' });
+            return;
+          }
+
+          if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            setMessage({ type: 'error', text: '两次输入的新密码不一致' });
+            return;
+          }
+
+          if (passwordForm.newPassword === '12345kiwi') {
+            setMessage({ type: 'error', text: '新密码不能与初始密码相同' });
+            return;
+          }
+
+          setSaving(true);
+
+          try {
+            const { error } = await supabase
+              .from('users')
+              .update({ password: passwordForm.newPassword, password_changed: true })
+              .eq('id', currentUser.id);
+
+            if (error) throw error;
+
+            onUserUpdate({ ...currentUser, password: passwordForm.newPassword, password_changed: true });
+            setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+            setMessage({ type: 'success', text: '密码修改成功' });
+          } catch (err) {
+            setMessage({ type: 'error', text: '修改失败：' + err.message });
+          } finally {
+            setSaving(false);
+          }
+        };
+
+        return (
+          <div>
+            <div style={{marginBottom:'32px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}>
+                <Icons.UserCheck/>
+                <h1 style={{fontSize:'24px',fontWeight:'700',color:'#1f2937',margin:0}}>个人中心</h1>
+              </div>
+              <p style={{fontSize:'15px',color:'#6b7280',margin:0}}>管理您的个人信息和账号设置</p>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'300px 1fr',gap:'32px'}}>
+              {/* Left: Avatar Card */}
+              <div style={{backgroundColor:'white',borderRadius:'16px',padding:'32px',textAlign:'center',boxShadow:'0 1px 3px rgba(0,0,0,0.08)'}}>
+                <div style={{position:'relative',display:'inline-block',marginBottom:'20px'}}>
+                  <div style={{width:'120px',height:'120px',borderRadius:'50%',backgroundColor:'#0d9488',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto',overflow:'hidden',border:'4px solid #f0fdfa'}}>
+                    {currentUser?.avatar_url ? (
+                      <img src={currentUser.avatar_url} alt="头像" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                    ) : (
+                      <span style={{fontSize:'48px',fontWeight:'600',color:'white'}}>{currentUser?.name?.[0] || 'A'}</span>
+                    )}
+                  </div>
+                  <label style={{position:'absolute',bottom:'0',right:'0',width:'36px',height:'36px',borderRadius:'50%',backgroundColor:'#0d9488',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>
+                    <input type="file" accept="image/*" onChange={handleAvatarUpload} style={{display:'none'}}/>
+                    {uploading ? <Icons.Spinner/> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>}
+                  </label>
+                </div>
+                <h3 style={{fontSize:'20px',fontWeight:'600',color:'#1f2937',marginBottom:'4px'}}>{currentUser?.name}</h3>
+                <p style={{fontSize:'14px',color:ROLES[currentUser?.role]?.color || '#6b7280',marginBottom:'16px'}}>{ROLES[currentUser?.role]?.label || '员工'}</p>
+                <div style={{padding:'12px 16px',backgroundColor:'#f9fafb',borderRadius:'10px',textAlign:'left'}}>
+                  <div style={{fontSize:'12px',color:'#9ca3af',marginBottom:'4px'}}>所属部门</div>
+                  <div style={{fontSize:'14px',color:'#1f2937',fontWeight:'500'}}>{userDept?.name || '未分配'}</div>
+                </div>
+              </div>
+
+              {/* Right: Settings Tabs */}
+              <div style={{backgroundColor:'white',borderRadius:'16px',boxShadow:'0 1px 3px rgba(0,0,0,0.08)'}}>
+                {/* Tabs */}
+                <div style={{display:'flex',borderBottom:'1px solid #e5e7eb'}}>
+                  {[
+                    { id: 'info', label: '基本信息', icon: Icons.Users },
+                    { id: 'security', label: '账号安全', icon: Icons.Lock }
+                  ].map(tab => (
+                    <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMessage({ type: '', text: '' }); }} style={{flex:1,padding:'16px',fontSize:'15px',fontWeight:activeTab===tab.id?'600':'500',color:activeTab===tab.id?'#0d9488':'#6b7280',backgroundColor:'transparent',border:'none',borderBottom:activeTab===tab.id?'2px solid #0d9488':'2px solid transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
+                      <tab.icon/>{tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tab Content */}
+                <div style={{padding:'32px'}}>
+                  {/* Message */}
+                  {message.text && (
+                    <div style={{padding:'12px 16px',borderRadius:'10px',marginBottom:'24px',backgroundColor:message.type==='error'?'#fef2f2':'#f0fdf4',color:message.type==='error'?'#dc2626':'#059669',fontSize:'14px'}}>
+                      {message.text}
+                    </div>
+                  )}
+
+                  {activeTab === 'info' && (
+                    <form onSubmit={handleSaveProfile}>
+                      <div style={{marginBottom:'24px'}}>
+                        <label style={{display:'block',marginBottom:'8px',fontSize:'14px',fontWeight:'500',color:'#374151'}}>姓名 *</label>
+                        <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} style={{width:'100%',padding:'14px 16px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'15px'}} placeholder="请输入您的姓名"/>
+                      </div>
+
+                      <div style={{marginBottom:'24px'}}>
+                        <label style={{display:'block',marginBottom:'8px',fontSize:'14px',fontWeight:'500',color:'#374151'}}>企业邮箱</label>
+                        <input type="text" value={form.email} disabled style={{width:'100%',padding:'14px 16px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'15px',backgroundColor:'#f9fafb',color:'#6b7280'}}/>
+                        <p style={{fontSize:'12px',color:'#9ca3af',marginTop:'6px'}}>企业邮箱由管理员分配，如需更改请联系管理员</p>
+                      </div>
+
+                      <div style={{marginBottom:'24px'}}>
+                        <label style={{display:'block',marginBottom:'8px',fontSize:'14px',fontWeight:'500',color:'#374151'}}>手机号码</label>
+                        <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} style={{width:'100%',padding:'14px 16px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'15px'}} placeholder="请输入手机号码（选填）"/>
+                      </div>
+
+                      <button type="submit" disabled={saving} className="btn-primary" style={{padding:'14px 32px'}}>
+                        {saving ? '保存中...' : '保存更改'}
+                      </button>
+                    </form>
+                  )}
+
+                  {activeTab === 'security' && (
+                    <form onSubmit={handleChangePassword}>
+                      <div style={{marginBottom:'24px'}}>
+                        <label style={{display:'block',marginBottom:'8px',fontSize:'14px',fontWeight:'500',color:'#374151'}}>当前密码 *</label>
+                        <input type="password" value={passwordForm.oldPassword} onChange={e => setPasswordForm({...passwordForm, oldPassword: e.target.value})} style={{width:'100%',padding:'14px 16px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'15px'}} placeholder="请输入当前密码" required/>
+                      </div>
+
+                      <div style={{marginBottom:'24px'}}>
+                        <label style={{display:'block',marginBottom:'8px',fontSize:'14px',fontWeight:'500',color:'#374151'}}>新密码 *</label>
+                        <input type="password" value={passwordForm.newPassword} onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})} style={{width:'100%',padding:'14px 16px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'15px'}} placeholder="至少6位" required/>
+                      </div>
+
+                      <div style={{marginBottom:'24px'}}>
+                        <label style={{display:'block',marginBottom:'8px',fontSize:'14px',fontWeight:'500',color:'#374151'}}>确认新密码 *</label>
+                        <input type="password" value={passwordForm.confirmPassword} onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})} style={{width:'100%',padding:'14px 16px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'15px'}} placeholder="再次输入新密码" required/>
+                      </div>
+
+                      <button type="submit" disabled={saving} className="btn-primary" style={{padding:'14px 32px'}}>
+                        {saving ? '修改中...' : '修改密码'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
       // ==================== TRAINING PAGE ====================
       const TrainingPage = ({ departments, selectedDepartment, setSelectedDepartment, trainingModules, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, onAddModule, onEditModule, onDeleteModule, canEditTraining, supabase, onRefresh, currentUser, resources }) => (
         <div>
@@ -1608,12 +1866,19 @@ D. 服务
           { id: 'users', label: '账号管理 Users', icon: Icons.Users },
         ];
 
+        // Handle user update from profile page
+        const handleUserUpdate = (updatedUser) => {
+          setCurrentUser(updatedUser);
+          localStorage.setItem('kiwitrain_user', JSON.stringify(updatedUser));
+        };
+
         const renderPage = () => {
           switch (activeNav) {
             case 'dashboard': return <Dashboard departments={departments} supabase={supabase}/>;
             case 'training': return <TrainingPage departments={departments} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} trainingModules={trainingModules} userProgress={userProgress} onToggleComplete={handleToggleComplete} onEditTask={task => setTaskModal({ open: true, task, moduleId: task.module_id })} onDeleteTask={handleDeleteTask} onAddTask={moduleId => setTaskModal({ open: true, task: null, moduleId })} onAddModule={() => setModuleModal({ open: true, module: null })} onEditModule={module => setModuleModal({ open: true, module })} onDeleteModule={handleDeleteModule} canEditTraining={canEditTraining} supabase={supabase} onRefresh={fetchTrainingModules} currentUser={currentUser} resources={resources}/>;
             case 'resources': return <ResourcesPage supabase={supabase} canUploadResources={canUploadResources} isAdmin={isAdmin}/>;
             case 'users': return canManageUsers ? <UsersPage departments={departments} supabase={supabase} onDepartmentsChange={fetchDepartments}/> : <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}><h2 style={{color:'#1f2937'}}>无权限访问</h2></div>;
+            case 'profile': return <ProfilePage currentUser={currentUser} supabase={supabase} onUserUpdate={handleUserUpdate} departments={departments}/>;
             default: return <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}><h2 style={{color:'#1f2937'}}>功能开发中...</h2></div>;
           }
         };
@@ -1632,11 +1897,21 @@ D. 服务
                 {navItems.map(item => { const Icon = item.icon; const isActive = activeNav === item.id; return (<div key={item.id} onClick={() => setActiveNav(item.id)} style={{display:'flex',alignItems:'center',gap:'12px',padding:'12px 14px',borderRadius:'10px',marginBottom:'4px',cursor:'pointer',backgroundColor:isActive?'#f0fdfa':'transparent',color:isActive?'#0d9488':'#6b7280',fontWeight:isActive?'600':'500',fontSize:'14px',transition:'all 0.2s'}}><Icon/><span>{item.label}</span></div>); })}
               </nav>
               <div style={{padding:'16px',borderTop:'1px solid #f3f4f6'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}}>
-                  <div style={{width:'40px',height:'40px',borderRadius:'10px',backgroundColor:'#0d9488',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'600',fontSize:'15px'}}>{currentUser?.name?.[0]||'A'}</div>
-                  <div><div style={{fontSize:'14px',fontWeight:'600',color:'#1f2937'}}>{currentUser?.name||'用户'}</div><div style={{fontSize:'12px',color:ROLES[currentUser?.role]?.color||'#9ca3af'}}>{ROLES[currentUser?.role]?.label||'员工'}</div></div>
+                {/* User Info - Clickable to go to Profile */}
+                <div onClick={() => setActiveNav('profile')} style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px',padding:'8px',borderRadius:'10px',cursor:'pointer',backgroundColor:activeNav==='profile'?'#f0fdfa':'transparent',transition:'all 0.2s'}}>
+                  <div style={{width:'40px',height:'40px',borderRadius:'10px',backgroundColor:'#0d9488',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'600',fontSize:'15px',overflow:'hidden'}}>
+                    {currentUser?.avatar_url ? (
+                      <img src={currentUser.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                    ) : (
+                      currentUser?.name?.[0]||'A'
+                    )}
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'14px',fontWeight:'600',color:'#1f2937'}}>{currentUser?.name||'用户'}</div>
+                    <div style={{fontSize:'12px',color:ROLES[currentUser?.role]?.color||'#9ca3af'}}>{ROLES[currentUser?.role]?.label||'员工'}</div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
                 </div>
-                <div onClick={() => setShowChangePassword(true)} style={{display:'flex',alignItems:'center',gap:'8px',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'8px 0',marginBottom:'4px',borderRadius:'6px'}}><Icons.Lock/><span>修改密码</span></div>
                 <div onClick={handleLogout} style={{display:'flex',alignItems:'center',gap:'8px',color:'#ef4444',fontSize:'13px',cursor:'pointer',padding:'8px 0'}}><Icons.Logout/><span>退出登录</span></div>
               </div>
             </div>
