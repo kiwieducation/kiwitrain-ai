@@ -25,6 +25,8 @@
     .fireworks-container { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; overflow: hidden; }
     .firework { position: absolute; width: 10px; height: 10px; border-radius: 50%; animation: firework 1s ease-out forwards; }
     .sparkle { position: absolute; font-size: 24px; animation: sparkle 0.8s ease-out forwards; }
+    .file-drop { border: 2px dashed #d1d5db; border-radius: 12px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .file-drop:hover { border-color: #0d9488; background-color: #f0fdfa; }
   </style>
 </head>
 <body>
@@ -45,6 +47,18 @@
       const SUPABASE_URL = 'https://ylrppnfncsxuynnzthum.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlscnBwbmZuY3N4dXlubnp0aHVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MTM4MjgsImV4cCI6MjA4MDk4OTgyOH0.MQ_iqHhxCIiw6k03Sfv0m2DSlcCXs5_wsvZbjANRGZg';
       const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // Role definitions
+      const ROLES = {
+        admin: { label: '管理员', color: '#dc2626', bg: '#fef2f2', perms: ['all'] },
+        leader: { label: '组长', color: '#d97706', bg: '#fef3c7', perms: ['edit_training', 'upload_resources'] },
+        admin_staff: { label: '行政', color: '#7c3aed', bg: '#f3e8ff', perms: ['manage_users'] },
+        employee: { label: '员工', color: '#6b7280', bg: '#f3f4f6', perms: [] }
+      };
+      const hasPerm = (user, perm) => {
+        if (!user || !ROLES[user.role]) return false;
+        return ROLES[user.role].perms.includes('all') || ROLES[user.role].perms.includes(perm);
+      };
 
       // Icons
       const Icons = {
@@ -78,6 +92,7 @@
         Spinner: () => <svg className="loading-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>,
         Task: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
         UserCheck: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>,
+        Calendar: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
       };
 
       // ==================== FIREWORKS ====================
@@ -191,7 +206,7 @@
       };
 
       // ==================== RESOURCES PAGE ====================
-      const ResourcesPage = ({ supabase, isAdmin }) => {
+      const ResourcesPage = ({ supabase, canUploadResources, isAdmin }) => {
         const [resources, setResources] = useState([]);
         const [loading, setLoading] = useState(true);
         const [showModal, setShowModal] = useState(false);
@@ -256,7 +271,7 @@
                   <option value="link">链接</option>
                 </select>
               </div>
-              {isAdmin && <button onClick={() => setShowModal(true)} className="btn-primary" style={{display:'flex',alignItems:'center',gap:'8px'}}><Icons.Plus/>上传资料</button>}
+              {canUploadResources && <button onClick={() => setShowModal(true)} className="btn-primary" style={{display:'flex',alignItems:'center',gap:'8px'}}><Icons.Plus/>上传资料</button>}
             </div>
 
             {loading ? <div style={{textAlign:'center',padding:'60px'}}><Icons.Spinner/></div> : filtered.length === 0 ? (
@@ -286,37 +301,83 @@
               </div>
             )}
 
-            {showModal && <ResourceModal onSave={handleSave} onClose={() => setShowModal(false)}/>}
+            {showModal && <ResourceModal supabase={supabase} onSave={handleSave} onClose={() => setShowModal(false)}/>}
           </div>
         );
       };
 
-      const ResourceModal = ({ onSave, onClose }) => {
+      const ResourceModal = ({ supabase, onSave, onClose }) => {
         const [form, setForm] = useState({ title: '', description: '', file_url: '', file_type: 'link' });
         const [saving, setSaving] = useState(false);
+        const [file, setFile] = useState(null);
+        const [uploadProgress, setUploadProgress] = useState('');
+        const fileInputRef = React.useRef();
+
+        const handleFileSelect = (e) => {
+          const f = e.target.files?.[0];
+          if (f) {
+            setFile(f);
+            if (!form.title) setForm({ ...form, title: f.name.split('.')[0] });
+            const ext = f.name.split('.').pop().toLowerCase();
+            if (['pdf', 'doc', 'docx'].includes(ext)) setForm(prev => ({ ...prev, file_type: 'pdf' }));
+            else if (['mp4', 'mov', 'avi'].includes(ext)) setForm(prev => ({ ...prev, file_type: 'video' }));
+            else setForm(prev => ({ ...prev, file_type: 'file' }));
+          }
+        };
 
         const handleSubmit = async (e) => {
           e.preventDefault();
-          if (!form.title || !form.file_url) { alert('请填写标题和链接'); return; }
+          if (!form.title) { alert('请填写标题'); return; }
+          if (!file && !form.file_url) { alert('请上传文件或填写链接'); return; }
+          
           setSaving(true);
-          await onSave(form);
+          let url = form.file_url;
+
+          if (file) {
+            setUploadProgress('上传中...');
+            const ext = file.name.split('.').pop();
+            const path = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
+            const { data, error } = await supabase.storage.from('resources').upload(path, file);
+            if (error) {
+              alert('上传失败: ' + error.message);
+              setSaving(false);
+              setUploadProgress('');
+              return;
+            }
+            const { data: { publicUrl } } = supabase.storage.from('resources').getPublicUrl(path);
+            url = publicUrl;
+          }
+          
+          await onSave({ title: form.title, description: form.description, file_url: url, file_type: form.file_type });
           setSaving(false);
         };
 
         return (
           <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{width:'500px'}} onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{width:'520px'}} onClick={e => e.stopPropagation()}>
               <h3 style={{margin:'0 0 24px',fontSize:'20px',fontWeight:'600'}}>上传资料</h3>
               <form onSubmit={handleSubmit}>
+                {/* File Upload Area */}
+                <div style={{marginBottom:'20px'}}>
+                  <div className="file-drop" onClick={() => fileInputRef.current?.click()}>
+                    <input ref={fileInputRef} type="file" style={{display:'none'}} onChange={handleFileSelect} accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp4,.mov,.jpg,.jpeg,.png,.gif"/>
+                    <Icons.Upload/>
+                    <p style={{marginTop:'12px',color:'#374151',fontWeight:'500'}}>{file ? file.name : '点击上传本地文件'}</p>
+                    <p style={{fontSize:'12px',color:'#9ca3af',marginTop:'4px'}}>支持 PDF、Word、PPT、Excel、视频、图片</p>
+                  </div>
+                </div>
+
+                <div style={{textAlign:'center',color:'#9ca3af',margin:'16px 0'}}>— 或输入外部链接 —</div>
+
                 <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>资料类型</label>
                   <div style={{display:'flex',gap:'8px'}}>
-                    {[{v:'link',l:'链接'},{v:'pdf',l:'PDF'},{v:'video',l:'视频'}].map(t => (<button key={t.v} type="button" onClick={() => setForm({...form, file_type: t.v})} style={{flex:1,padding:'10px',borderRadius:'8px',border:form.file_type===t.v?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:form.file_type===t.v?'#f0fdfa':'white',color:form.file_type===t.v?'#0d9488':'#6b7280',fontSize:'14px',cursor:'pointer'}}>{t.l}</button>))}
+                    {[{v:'link',l:'链接'},{v:'pdf',l:'文档'},{v:'video',l:'视频'}].map(t => (<button key={t.v} type="button" onClick={() => setForm({...form, file_type: t.v})} style={{flex:1,padding:'10px',borderRadius:'8px',border:form.file_type===t.v?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:form.file_type===t.v?'#f0fdfa':'white',color:form.file_type===t.v?'#0d9488':'#6b7280',fontSize:'14px',cursor:'pointer'}}>{t.l}</button>))}
                   </div>
                 </div>
                 <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>资料标题 *</label><input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="如：公司介绍手册" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}} required/></div>
-                <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>资料链接 *</label><input type="url" value={form.file_url} onChange={e => setForm({...form, file_url: e.target.value})} placeholder="https://..." style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}} required/></div>
+                {!file && <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>资料链接</label><input type="url" value={form.file_url} onChange={e => setForm({...form, file_url: e.target.value})} placeholder="https://..." style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/></div>}
                 <div style={{marginBottom:'24px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>描述说明</label><textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="资料简介（选填）" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',minHeight:'80px',resize:'vertical'}}/></div>
-                <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary">{saving ? '保存中...' : '保存'}</button></div>
+                <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary">{saving ? (uploadProgress || '保存中...') : '保存'}</button></div>
               </form>
             </div>
           </div>
@@ -784,7 +845,7 @@ D. 服务
       };
 
       // ==================== TRAINING TASK ====================
-      const TrainingTask = ({ task, isCompleted, onToggleComplete, onEdit, onDelete, isAdmin, supabase, onRefresh, currentUser, resources }) => {
+      const TrainingTask = ({ task, isCompleted, onToggleComplete, onEdit, onDelete, canEditTraining, supabase, onRefresh, currentUser, resources }) => {
         const [loading, setLoading] = useState(false);
         const [showMaterials, setShowMaterials] = useState(false);
         const [showQuiz, setShowQuiz] = useState(false);
@@ -863,7 +924,7 @@ D. 服务
                   </div>
                 </div>
 
-                {isAdmin && (
+                {canEditTraining && (
                   <div style={{display:'flex',gap:'6px',flexShrink:0}}>
                     <button onClick={() => setShowMaterials(true)} className="btn-icon" style={{backgroundColor:'#dbeafe',color:'#3b82f6'}} title="管理资料"><Icons.Document/></button>
                     <button onClick={() => setShowQuiz(true)} className="btn-icon" style={{backgroundColor:'#fef3c7',color:'#d97706'}} title="管理考核"><Icons.Quiz/></button>
@@ -883,21 +944,29 @@ D. 服务
       };
 
       // ==================== DAY MODULE ====================
-      const DayModule = ({ module, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, isAdmin, supabase, onRefresh, currentUser, resources }) => {
+      const DayModule = ({ module, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, onEditModule, onDeleteModule, canEditTraining, supabase, onRefresh, currentUser, resources }) => {
         const [isExpanded, setIsExpanded] = useState(true);
         return (
           <div style={{marginBottom:'24px'}}>
-            <div onClick={() => setIsExpanded(!isExpanded)} style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px',cursor:'pointer'}}>
-              <div style={{backgroundColor:'#0d9488',color:'white',padding:'6px 14px',borderRadius:'8px',fontSize:'14px',fontWeight:'600'}}>D{module.day_number}</div>
-              <h3 style={{fontSize:'17px',fontWeight:'600',color:'#1f2937',margin:0,flex:1}}>{module.title}</h3>
-              {module.is_fixed && <div style={{display:'flex',alignItems:'center',gap:'4px',backgroundColor:'#f3f4f6',padding:'4px 10px',borderRadius:'6px',fontSize:'12px',color:'#6b7280'}}><Icons.Lock/><span>固定课程</span></div>}
-              <div style={{display:'flex',alignItems:'center',gap:'4px',color:'#9ca3af',fontSize:'13px'}}><Icons.Clock/><span>{module.duration}</span></div>
-              <Icons.Chevron expanded={isExpanded}/>
+            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}}>
+              <div onClick={() => setIsExpanded(!isExpanded)} style={{display:'flex',alignItems:'center',gap:'12px',flex:1,cursor:'pointer'}}>
+                <div style={{backgroundColor:'#0d9488',color:'white',padding:'6px 14px',borderRadius:'8px',fontSize:'14px',fontWeight:'600'}}>D{module.day_number}</div>
+                <h3 style={{fontSize:'17px',fontWeight:'600',color:'#1f2937',margin:0,flex:1}}>{module.title}</h3>
+                {module.is_fixed && <div style={{display:'flex',alignItems:'center',gap:'4px',backgroundColor:'#f3f4f6',padding:'4px 10px',borderRadius:'6px',fontSize:'12px',color:'#6b7280'}}><Icons.Lock/><span>固定</span></div>}
+                <div style={{display:'flex',alignItems:'center',gap:'4px',color:'#9ca3af',fontSize:'13px'}}><Icons.Clock/><span>{module.duration}</span></div>
+                <Icons.Chevron expanded={isExpanded}/>
+              </div>
+              {canEditTraining && (
+                <div style={{display:'flex',gap:'6px'}}>
+                  <button onClick={() => onEditModule(module)} className="btn-icon" style={{backgroundColor:'#f3f4f6',color:'#6b7280'}}><Icons.Edit/></button>
+                  <button onClick={() => onDeleteModule(module.id)} className="btn-icon" style={{backgroundColor:'#fef2f2',color:'#ef4444'}}><Icons.Delete/></button>
+                </div>
+              )}
             </div>
             {isExpanded && (
               <div style={{marginLeft:'4px'}}>
-                {module.training_tasks?.map(task => <TrainingTask key={task.id} task={task} isCompleted={userProgress?.find(p => p.task_id === task.id)?.is_completed || false} onToggleComplete={onToggleComplete} onEdit={onEditTask} onDelete={onDeleteTask} isAdmin={isAdmin} supabase={supabase} onRefresh={onRefresh} currentUser={currentUser} resources={resources}/>)}
-                {isAdmin && <button onClick={() => onAddTask(module.id)} style={{display:'flex',alignItems:'center',gap:'8px',padding:'12px 16px',borderRadius:'10px',border:'2px dashed #d1d5db',backgroundColor:'transparent',color:'#6b7280',fontSize:'14px',cursor:'pointer',width:'100%',justifyContent:'center'}}><Icons.Plus/>添加任务</button>}
+                {module.training_tasks?.map(task => <TrainingTask key={task.id} task={task} isCompleted={userProgress?.find(p => p.task_id === task.id)?.is_completed || false} onToggleComplete={onToggleComplete} onEdit={onEditTask} onDelete={onDeleteTask} canEditTraining={canEditTraining} supabase={supabase} onRefresh={onRefresh} currentUser={currentUser} resources={resources}/>)}
+                {canEditTraining && <button onClick={() => onAddTask(module.id)} style={{display:'flex',alignItems:'center',gap:'8px',padding:'12px 16px',borderRadius:'10px',border:'2px dashed #d1d5db',backgroundColor:'transparent',color:'#6b7280',fontSize:'14px',cursor:'pointer',width:'100%',justifyContent:'center'}}><Icons.Plus/>添加任务</button>}
               </div>
             )}
           </div>
@@ -941,13 +1010,56 @@ D. 服务
         );
       };
 
+      // ==================== MODULE MODAL (Add Training Day) ====================
+      const ModuleModal = ({ module, departmentId, onSave, onClose }) => {
+        const [form, setForm] = useState({ 
+          title: module?.title || '', 
+          day_number: module?.day_number || 1,
+          duration: module?.duration || '1天',
+          is_fixed: module?.is_fixed || false
+        });
+        const [saving, setSaving] = useState(false);
+        const handleSubmit = async (e) => { 
+          e.preventDefault(); 
+          setSaving(true); 
+          await onSave({ ...form, id: module?.id, department_id: departmentId }); 
+          setSaving(false); 
+          onClose(); 
+        };
+        return (
+          <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" style={{width:'480px'}} onClick={e => e.stopPropagation()}>
+              <h3 style={{margin:'0 0 24px',fontSize:'20px',fontWeight:'600'}}>{module ? '编辑培训日' : '添加培训日'}</h3>
+              <form onSubmit={handleSubmit}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px',marginBottom:'16px'}}>
+                  <div><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>天数 *</label><input type="number" value={form.day_number} onChange={e => setForm({...form, day_number: parseInt(e.target.value)||1})} min="1" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}} required/></div>
+                  <div><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>时长</label><input type="text" value={form.duration} onChange={e => setForm({...form, duration: e.target.value})} placeholder="如: 1天" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/></div>
+                </div>
+                <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>培训主题 *</label><input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="如: 公司文化与规章制度" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}} required/></div>
+                <div style={{marginBottom:'24px'}}><label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer'}}><input type="checkbox" checked={form.is_fixed} onChange={e => setForm({...form, is_fixed: e.target.checked})} style={{width:'16px',height:'16px'}}/><span style={{fontSize:'14px'}}>固定课程（所有新员工必修）</span></label></div>
+                <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary">{saving ? '保存中...' : '保存'}</button></div>
+              </form>
+            </div>
+          </div>
+        );
+      };
+
       // ==================== TRAINING PAGE ====================
-      const TrainingPage = ({ departments, selectedDepartment, setSelectedDepartment, trainingModules, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, isAdmin, supabase, onRefresh, currentUser, resources }) => (
+      const TrainingPage = ({ departments, selectedDepartment, setSelectedDepartment, trainingModules, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, onAddModule, onEditModule, onDeleteModule, canEditTraining, supabase, onRefresh, currentUser, resources }) => (
         <div>
-          <div style={{marginBottom:'32px'}}><div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}><Icons.Sparkles/><h1 style={{fontSize:'24px',fontWeight:'700',color:'#1f2937',margin:0}}>智能培训计划 {isAdmin && '(管理员)'}</h1></div><p style={{fontSize:'15px',color:'#6b7280',margin:0}}>{isAdmin ? '管理培训内容、学习资料和考核题目' : '完成培训任务，开始你的职业之旅'}</p></div>
+          <div style={{marginBottom:'32px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}><Icons.Sparkles/><h1 style={{fontSize:'24px',fontWeight:'700',color:'#1f2937',margin:0}}>智能培训计划 {canEditTraining && '(编辑模式)'}</h1></div>
+              {canEditTraining && <button onClick={onAddModule} className="btn-primary" style={{display:'flex',alignItems:'center',gap:'8px'}}><Icons.Calendar/>添加培训日</button>}
+            </div>
+            <p style={{fontSize:'15px',color:'#6b7280',margin:0}}>{canEditTraining ? '管理培训内容、学习资料和考核题目' : '完成培训任务，开始你的职业之旅'}</p>
+          </div>
           <div style={{display:'grid',gridTemplateColumns:'280px 1fr',gap:'32px'}}>
             <div><div style={{fontSize:'14px',fontWeight:'600',color:'#374151',marginBottom:'12px'}}>目标部门 / 岗位</div><div style={{display:'flex',flexDirection:'column',gap:'8px'}}>{departments.map(dept => (<div key={dept.id} onClick={() => setSelectedDepartment(dept)} style={{padding:'14px 18px',borderRadius:'10px',border:selectedDepartment?.id===dept.id?'2px solid #14b8a6':'1px solid #e5e7eb',backgroundColor:selectedDepartment?.id===dept.id?'#f0fdfa':'#ffffff',color:selectedDepartment?.id===dept.id?'#0d9488':'#374151',fontWeight:selectedDepartment?.id===dept.id?'600':'500',fontSize:'15px',cursor:'pointer'}}>{dept.name}</div>))}</div></div>
-            <div><h2 style={{fontSize:'20px',fontWeight:'700',color:'#1f2937',marginBottom:'24px',paddingBottom:'16px',borderBottom:'2px solid #e5e7eb'}}>{selectedDepartment?.name || ''} - 入职培训日程</h2>{trainingModules.length === 0 ? <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}>暂无培训内容</div> : trainingModules.map(module => <DayModule key={module.id} module={module} userProgress={userProgress} onToggleComplete={onToggleComplete} onEditTask={onEditTask} onDeleteTask={onDeleteTask} onAddTask={onAddTask} isAdmin={isAdmin} supabase={supabase} onRefresh={onRefresh} currentUser={currentUser} resources={resources}/>)}</div>
+            <div>
+              <h2 style={{fontSize:'20px',fontWeight:'700',color:'#1f2937',marginBottom:'24px',paddingBottom:'16px',borderBottom:'2px solid #e5e7eb'}}>{selectedDepartment?.name || ''} - 入职培训日程</h2>
+              {trainingModules.length === 0 ? <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}>暂无培训内容{canEditTraining && <div style={{marginTop:'12px'}}><button onClick={onAddModule} className="btn-primary">添加第一个培训日</button></div>}</div> : trainingModules.map(module => <DayModule key={module.id} module={module} userProgress={userProgress} onToggleComplete={onToggleComplete} onEditTask={onEditTask} onDeleteTask={onDeleteTask} onAddTask={onAddTask} onEditModule={onEditModule} onDeleteModule={onDeleteModule} canEditTraining={canEditTraining} supabase={supabase} onRefresh={onRefresh} currentUser={currentUser} resources={resources}/>)}
+            </div>
           </div>
         </div>
       );
@@ -1004,7 +1116,7 @@ D. 服务
                           <td style={{padding:'16px 20px'}}><div style={{display:'flex',alignItems:'center',gap:'12px'}}><div style={{width:'40px',height:'40px',borderRadius:'10px',backgroundColor:'#0d9488',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'600'}}>{u.name?.[0]||'?'}</div><span style={{fontWeight:'600'}}>{u.name}</span></div></td>
                           <td style={{padding:'16px 20px',color:'#6b7280',fontSize:'14px'}}>{u.email}</td>
                           <td style={{padding:'16px 20px'}}><span style={{padding:'4px 12px',borderRadius:'20px',backgroundColor:'#f0fdfa',color:'#0d9488',fontSize:'13px'}}>{departments.find(d => d.id === u.department_id)?.name || '未分配'}</span></td>
-                          <td style={{padding:'16px 20px'}}><span style={{padding:'4px 12px',borderRadius:'20px',backgroundColor:u.role==='admin'?'#fef3c7':'#f3f4f6',color:u.role==='admin'?'#d97706':'#6b7280',fontSize:'13px'}}>{u.role==='admin'?'管理员':'员工'}</span></td>
+                          <td style={{padding:'16px 20px'}}><span style={{padding:'4px 12px',borderRadius:'20px',backgroundColor:ROLES[u.role]?.bg||'#f3f4f6',color:ROLES[u.role]?.color||'#6b7280',fontSize:'13px'}}>{ROLES[u.role]?.label||'员工'}</span></td>
                           <td style={{padding:'16px 20px',textAlign:'right'}}><button onClick={() => setModal({ open: true, type: 'user', data: u })} className="btn-icon" style={{backgroundColor:'#f3f4f6',color:'#6b7280',marginRight:'8px'}}><Icons.Edit/></button><button onClick={() => handleDeleteUser(u.id)} className="btn-icon" style={{backgroundColor:'#fef2f2',color:'#ef4444'}}><Icons.Delete/></button></td>
                         </tr>
                       ))}
@@ -1036,6 +1148,12 @@ D. 服务
         const [form, setForm] = useState({ name: user?.name || '', username: user?.email?.split('@')[0] || '', password: '', department_id: user?.department_id || '', role: user?.role || 'employee' });
         const [saving, setSaving] = useState(false);
         const handleSubmit = async (e) => { e.preventDefault(); if (!form.name || !form.username || !form.department_id) { alert('请填写必填项'); return; } setSaving(true); await onSave({ id: user?.id, name: form.name, email: form.username + '@mykiwiedu.com', department_id: form.department_id, role: form.role }); setSaving(false); onClose(); };
+        const roleOptions = [
+          { key: 'employee', label: '普通员工' },
+          { key: 'leader', label: '组长' },
+          { key: 'admin_staff', label: '行政' },
+          { key: 'admin', label: '管理员' }
+        ];
         return (
           <div className="modal-overlay" onClick={onClose}><div className="modal-content" style={{width:'480px'}} onClick={e => e.stopPropagation()}>
             <h3 style={{margin:'0 0 24px',fontSize:'20px',fontWeight:'600'}}>{user ? '编辑员工' : '添加员工'}</h3>
@@ -1043,7 +1161,7 @@ D. 服务
               <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>姓名 *</label><input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}} required/></div>
               <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>用户名 *</label><div style={{display:'flex'}}><input type="text" value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '')})} style={{flex:1,padding:'12px',borderRadius:'10px 0 0 10px',border:'1px solid #e5e7eb',borderRight:'none',fontSize:'14px'}}/><span style={{padding:'12px',backgroundColor:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'0 10px 10px 0',color:'#6b7280',fontSize:'14px'}}>@mykiwiedu.com</span></div></div>
               <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>所属部门 *</label><select value={form.department_id} onChange={e => setForm({...form, department_id: e.target.value})} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',backgroundColor:'white'}} required><option value="">请选择</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
-              <div style={{marginBottom:'24px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>角色</label><div style={{display:'flex',gap:'12px'}}>{['employee', 'admin'].map(r => (<label key={r} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px',borderRadius:'10px',border:form.role===r?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:form.role===r?'#f0fdfa':'white',cursor:'pointer'}}><input type="radio" name="role" checked={form.role===r} onChange={() => setForm({...form, role: r})} style={{display:'none'}}/><span style={{color:form.role===r?'#0d9488':'#6b7280'}}>{r==='employee'?'普通员工':'管理员'}</span></label>))}</div></div>
+              <div style={{marginBottom:'24px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>角色</label><div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px'}}>{roleOptions.map(r => (<label key={r.key} style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'10px',borderRadius:'8px',border:form.role===r.key?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:form.role===r.key?'#f0fdfa':'white',cursor:'pointer',fontSize:'13px'}}><input type="radio" name="role" checked={form.role===r.key} onChange={() => setForm({...form, role: r.key})} style={{display:'none'}}/><span style={{color:form.role===r.key?'#0d9488':'#6b7280'}}>{r.label}</span></label>))}</div><div style={{marginTop:'8px',fontSize:'12px',color:'#9ca3af'}}>组长: 编辑培训计划和资料库 | 行政: 管理员工账号</div></div>
               <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary">{saving ? '保存中...' : '保存'}</button></div>
             </form>
           </div></div>
@@ -1077,9 +1195,13 @@ D. 服务
         const [loading, setLoading] = useState(true);
         const [error, setError] = useState(null);
         const [taskModal, setTaskModal] = useState({ open: false, task: null, moduleId: null });
+        const [moduleModal, setModuleModal] = useState({ open: false, module: null });
         const [resources, setResources] = useState([]);
 
         const isAdmin = currentUser?.role === 'admin';
+        const canEditTraining = hasPerm(currentUser, 'edit_training') || hasPerm(currentUser, 'all');
+        const canUploadResources = hasPerm(currentUser, 'upload_resources') || hasPerm(currentUser, 'all');
+        const canManageUsers = hasPerm(currentUser, 'manage_users') || hasPerm(currentUser, 'all');
 
         const fetchDepartments = async () => {
           const { data, error } = await supabase.from('departments').select('*').order('sort_order');
@@ -1116,6 +1238,22 @@ D. 服务
 
         const handleDeleteTask = async (taskId) => { if (!confirm('确定删除？')) return; await supabase.from('training_tasks').delete().eq('id', taskId); await fetchTrainingModules(); };
 
+        const handleSaveModule = async (moduleData) => {
+          if (moduleData.id) { 
+            await supabase.from('training_modules').update({ title: moduleData.title, day_number: moduleData.day_number, duration: moduleData.duration, is_fixed: moduleData.is_fixed }).eq('id', moduleData.id); 
+          } else { 
+            const { data: existing } = await supabase.from('training_modules').select('sort_order').eq('department_id', selectedDepartment.id).order('sort_order', { ascending: false }).limit(1); 
+            await supabase.from('training_modules').insert({ department_id: selectedDepartment.id, title: moduleData.title, day_number: moduleData.day_number, duration: moduleData.duration, is_fixed: moduleData.is_fixed, sort_order: (existing?.[0]?.sort_order || 0) + 1 }); 
+          }
+          await fetchTrainingModules();
+        };
+
+        const handleDeleteModule = async (moduleId) => { 
+          if (!confirm('确定删除此培训日？相关任务也会被删除')) return; 
+          await supabase.from('training_modules').delete().eq('id', moduleId); 
+          await fetchTrainingModules(); 
+        };
+
         useEffect(() => { (async () => { setLoading(true); setCurrentUser({ id: 'demo-user-id', name: '管理员', role: 'admin', email: 'admin@mykiwiedu.com' }); await fetchDepartments(); await fetchResources(); setLoading(false); })(); }, []);
         useEffect(() => { if (selectedDepartment) fetchTrainingModules(); }, [selectedDepartment]);
 
@@ -1133,9 +1271,9 @@ D. 服务
         const renderPage = () => {
           switch (activeNav) {
             case 'dashboard': return <Dashboard departments={departments} supabase={supabase}/>;
-            case 'training': return <TrainingPage departments={departments} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} trainingModules={trainingModules} userProgress={userProgress} onToggleComplete={handleToggleComplete} onEditTask={task => setTaskModal({ open: true, task, moduleId: task.module_id })} onDeleteTask={handleDeleteTask} onAddTask={moduleId => setTaskModal({ open: true, task: null, moduleId })} isAdmin={isAdmin} supabase={supabase} onRefresh={fetchTrainingModules} currentUser={currentUser} resources={resources}/>;
-            case 'resources': return <ResourcesPage supabase={supabase} isAdmin={isAdmin}/>;
-            case 'users': return <UsersPage departments={departments} supabase={supabase} onDepartmentsChange={fetchDepartments}/>;
+            case 'training': return <TrainingPage departments={departments} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} trainingModules={trainingModules} userProgress={userProgress} onToggleComplete={handleToggleComplete} onEditTask={task => setTaskModal({ open: true, task, moduleId: task.module_id })} onDeleteTask={handleDeleteTask} onAddTask={moduleId => setTaskModal({ open: true, task: null, moduleId })} onAddModule={() => setModuleModal({ open: true, module: null })} onEditModule={module => setModuleModal({ open: true, module })} onDeleteModule={handleDeleteModule} canEditTraining={canEditTraining} supabase={supabase} onRefresh={fetchTrainingModules} currentUser={currentUser} resources={resources}/>;
+            case 'resources': return <ResourcesPage supabase={supabase} canUploadResources={canUploadResources} isAdmin={isAdmin}/>;
+            case 'users': return canManageUsers ? <UsersPage departments={departments} supabase={supabase} onDepartmentsChange={fetchDepartments}/> : <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}><h2 style={{color:'#1f2937'}}>无权限访问</h2></div>;
             default: return <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}><h2 style={{color:'#1f2937'}}>功能开发中...</h2></div>;
           }
         };
@@ -1166,6 +1304,7 @@ D. 服务
             <div style={{flex:1,marginLeft:'240px',padding:'28px 36px'}}>{renderPage()}</div>
             
             {taskModal.open && <TaskModal task={taskModal.task} moduleId={taskModal.moduleId} onSave={handleSaveTask} onClose={() => setTaskModal({ open: false, task: null, moduleId: null })}/>}
+            {moduleModal.open && <ModuleModal module={moduleModal.module} departmentId={selectedDepartment?.id} onSave={handleSaveModule} onClose={() => setModuleModal({ open: false, module: null })}/>}
           </div>
         );
       }
