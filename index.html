@@ -11,14 +11,20 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; background-color: #f8fafa; }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes firework { 0% { transform: scale(0); opacity: 1; } 50% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+    @keyframes sparkle { 0%, 100% { opacity: 0; transform: scale(0); } 50% { opacity: 1; transform: scale(1); } }
     .loading-spinner { animation: spin 1s linear infinite; }
     input:focus, textarea:focus, select:focus { outline: none; border-color: #14b8a6 !important; }
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
     .modal-content { background: white; border-radius: 16px; padding: 28px; max-height: 90vh; overflow-y: auto; }
     .btn-primary { padding: 10px 20px; border-radius: 10px; border: none; background: #0d9488; color: white; font-size: 14px; font-weight: 500; cursor: pointer; }
     .btn-primary:hover { background: #0f766e; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-secondary { padding: 10px 20px; border-radius: 10px; border: 1px solid #e5e7eb; background: white; font-size: 14px; cursor: pointer; }
     .btn-icon { padding: 8px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .fireworks-container { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; overflow: hidden; }
+    .firework { position: absolute; width: 10px; height: 10px; border-radius: 50%; animation: firework 1s ease-out forwards; }
+    .sparkle { position: absolute; font-size: 24px; animation: sparkle 0.8s ease-out forwards; }
   </style>
 </head>
 <body>
@@ -33,7 +39,7 @@
   </script>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useCallback } = React;
 
     window.initApp = function() {
       const SUPABASE_URL = 'https://ylrppnfncsxuynnzthum.supabase.co';
@@ -59,19 +65,59 @@
         Edit: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
         Delete: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
         Link: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
-        Play: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
-        FileText: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
         CheckCircle: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
         X: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
         Download: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+        Upload: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
         Building: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/></svg>,
         TrendUp: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
         Search: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
-        Mail: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
-        Key: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
+        Eye: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+        FileText: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+        Video: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>,
         Spinner: () => <svg className="loading-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>,
         Task: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
         UserCheck: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>,
+      };
+
+      // ==================== FIREWORKS ====================
+      const Fireworks = ({ show, onComplete }) => {
+        useEffect(() => {
+          if (show) {
+            const timer = setTimeout(onComplete, 3000);
+            return () => clearTimeout(timer);
+          }
+        }, [show]);
+
+        if (!show) return null;
+
+        const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9', '#fd79a8', '#a29bfe'];
+        const particles = [];
+        const sparkles = [];
+
+        for (let i = 0; i < 50; i++) {
+          const x = Math.random() * 100;
+          const y = Math.random() * 100;
+          const color = colors[Math.floor(Math.random() * colors.length)];
+          const delay = Math.random() * 0.5;
+          const size = 5 + Math.random() * 10;
+          particles.push(
+            <div key={i} className="firework" style={{ left: `${x}%`, top: `${y}%`, backgroundColor: color, width: size, height: size, animationDelay: `${delay}s` }}/>
+          );
+        }
+
+        const emojis = ['🎉', '✨', '🎊', '⭐', '🌟', '💫'];
+        for (let i = 0; i < 20; i++) {
+          const x = Math.random() * 100;
+          const y = Math.random() * 100;
+          const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+          const delay = Math.random() * 1;
+          sparkles.push(
+            <div key={`s${i}`} className="sparkle" style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${delay}s` }}>{emoji}</div>
+          );
+        }
+
+        return <div className="fireworks-container">{particles}{sparkles}</div>;
       };
 
       // ==================== DASHBOARD ====================
@@ -144,12 +190,144 @@
         );
       };
 
+      // ==================== RESOURCES PAGE ====================
+      const ResourcesPage = ({ supabase, isAdmin }) => {
+        const [resources, setResources] = useState([]);
+        const [loading, setLoading] = useState(true);
+        const [showModal, setShowModal] = useState(false);
+        const [searchTerm, setSearchTerm] = useState('');
+        const [filter, setFilter] = useState('all');
+
+        const fetchResources = async () => {
+          const { data } = await supabase.from('resources').select('*').order('created_at', { ascending: false });
+          setResources(data || []);
+          setLoading(false);
+        };
+
+        useEffect(() => { fetchResources(); }, []);
+
+        const handleSave = async (data) => {
+          await supabase.from('resources').insert(data);
+          await fetchResources();
+          setShowModal(false);
+        };
+
+        const handleDelete = async (id) => {
+          if (!confirm('确定删除此资料？')) return;
+          await supabase.from('resources').delete().eq('id', id);
+          await fetchResources();
+        };
+
+        const filtered = resources.filter(r => {
+          const matchSearch = r.title?.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchFilter = filter === 'all' || r.file_type === filter;
+          return matchSearch && matchFilter;
+        });
+
+        const getTypeIcon = (type) => {
+          switch(type) {
+            case 'video': return <Icons.Video/>;
+            case 'pdf': return <Icons.FileText/>;
+            case 'link': return <Icons.Link/>;
+            default: return <Icons.Document/>;
+          }
+        };
+
+        const getTypeColor = (type) => {
+          switch(type) {
+            case 'video': return { bg: '#fef3c7', color: '#d97706' };
+            case 'pdf': return { bg: '#fee2e2', color: '#dc2626' };
+            case 'link': return { bg: '#dbeafe', color: '#3b82f6' };
+            default: return { bg: '#f3f4f6', color: '#6b7280' };
+          }
+        };
+
+        return (
+          <div>
+            <div style={{marginBottom:'32px'}}><div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}><Icons.Resources/><h1 style={{fontSize:'24px',fontWeight:'700',color:'#1f2937',margin:0}}>资料库</h1></div><p style={{fontSize:'15px',color:'#6b7280',margin:0}}>管理培训学习资料</p></div>
+
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'24px'}}>
+              <div style={{display:'flex',gap:'12px'}}>
+                <div style={{position:'relative'}}><input type="text" placeholder="搜索资料..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{width:'280px',padding:'10px 12px 10px 40px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/><div style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#9ca3af'}}><Icons.Search/></div></div>
+                <select value={filter} onChange={e => setFilter(e.target.value)} style={{padding:'10px 16px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',backgroundColor:'white'}}>
+                  <option value="all">全部类型</option>
+                  <option value="pdf">PDF文档</option>
+                  <option value="video">视频</option>
+                  <option value="link">链接</option>
+                </select>
+              </div>
+              {isAdmin && <button onClick={() => setShowModal(true)} className="btn-primary" style={{display:'flex',alignItems:'center',gap:'8px'}}><Icons.Plus/>上传资料</button>}
+            </div>
+
+            {loading ? <div style={{textAlign:'center',padding:'60px'}}><Icons.Spinner/></div> : filtered.length === 0 ? (
+              <div style={{textAlign:'center',padding:'60px',backgroundColor:'white',borderRadius:'16px',border:'1px solid #e5e7eb'}}>
+                <Icons.Resources/>
+                <p style={{marginTop:'12px',color:'#9ca3af'}}>暂无资料</p>
+              </div>
+            ) : (
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:'16px'}}>
+                {filtered.map(r => {
+                  const typeStyle = getTypeColor(r.file_type);
+                  return (
+                    <div key={r.id} style={{backgroundColor:'white',borderRadius:'16px',padding:'20px',border:'1px solid #e5e7eb'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'12px'}}>
+                        <div style={{width:'48px',height:'48px',borderRadius:'12px',backgroundColor:typeStyle.bg,display:'flex',alignItems:'center',justifyContent:'center',color:typeStyle.color}}>{getTypeIcon(r.file_type)}</div>
+                        {isAdmin && <button onClick={() => handleDelete(r.id)} className="btn-icon" style={{backgroundColor:'#fef2f2',color:'#ef4444'}}><Icons.Delete/></button>}
+                      </div>
+                      <h3 style={{fontSize:'16px',fontWeight:'600',color:'#1f2937',marginBottom:'8px'}}>{r.title}</h3>
+                      {r.description && <p style={{fontSize:'13px',color:'#6b7280',marginBottom:'12px',lineHeight:'1.5'}}>{r.description}</p>}
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span style={{padding:'4px 10px',borderRadius:'6px',fontSize:'12px',backgroundColor:typeStyle.bg,color:typeStyle.color}}>{r.file_type?.toUpperCase() || 'FILE'}</span>
+                        {r.file_url && <a href={r.file_url} target="_blank" style={{display:'flex',alignItems:'center',gap:'4px',color:'#0d9488',fontSize:'13px',textDecoration:'none'}}><Icons.Eye/>查看</a>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {showModal && <ResourceModal onSave={handleSave} onClose={() => setShowModal(false)}/>}
+          </div>
+        );
+      };
+
+      const ResourceModal = ({ onSave, onClose }) => {
+        const [form, setForm] = useState({ title: '', description: '', file_url: '', file_type: 'link' });
+        const [saving, setSaving] = useState(false);
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          if (!form.title || !form.file_url) { alert('请填写标题和链接'); return; }
+          setSaving(true);
+          await onSave(form);
+          setSaving(false);
+        };
+
+        return (
+          <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" style={{width:'500px'}} onClick={e => e.stopPropagation()}>
+              <h3 style={{margin:'0 0 24px',fontSize:'20px',fontWeight:'600'}}>上传资料</h3>
+              <form onSubmit={handleSubmit}>
+                <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>资料类型</label>
+                  <div style={{display:'flex',gap:'8px'}}>
+                    {[{v:'link',l:'链接'},{v:'pdf',l:'PDF'},{v:'video',l:'视频'}].map(t => (<button key={t.v} type="button" onClick={() => setForm({...form, file_type: t.v})} style={{flex:1,padding:'10px',borderRadius:'8px',border:form.file_type===t.v?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:form.file_type===t.v?'#f0fdfa':'white',color:form.file_type===t.v?'#0d9488':'#6b7280',fontSize:'14px',cursor:'pointer'}}>{t.l}</button>))}
+                  </div>
+                </div>
+                <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>资料标题 *</label><input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="如：公司介绍手册" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}} required/></div>
+                <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>资料链接 *</label><input type="url" value={form.file_url} onChange={e => setForm({...form, file_url: e.target.value})} placeholder="https://..." style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}} required/></div>
+                <div style={{marginBottom:'24px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>描述说明</label><textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="资料简介（选填）" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',minHeight:'80px',resize:'vertical'}}/></div>
+                <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary">{saving ? '保存中...' : '保存'}</button></div>
+              </form>
+            </div>
+          </div>
+        );
+      };
+
       // ==================== MATERIALS MODAL ====================
-      const MaterialsModal = ({ task, supabase, onClose, onUpdate }) => {
+      const MaterialsModal = ({ task, supabase, resources, onClose, onUpdate }) => {
         const [materials, setMaterials] = useState([]);
         const [loading, setLoading] = useState(true);
-        const [newMaterial, setNewMaterial] = useState({ type: 'link', title: '', url: '' });
-        const [saving, setSaving] = useState(false);
+        const [newMaterial, setNewMaterial] = useState({ type: 'link', title: '', url: '', resource_id: '' });
 
         useEffect(() => { fetchMaterials(); }, []);
 
@@ -160,12 +338,16 @@
         };
 
         const handleAdd = async () => {
-          if (!newMaterial.title || !newMaterial.url) return;
-          setSaving(true);
-          await supabase.from('task_materials').insert({ task_id: task.id, external_title: newMaterial.title, external_url: newMaterial.url, sort_order: materials.length });
+          if (newMaterial.type === 'link' && (!newMaterial.title || !newMaterial.url)) return;
+          if (newMaterial.type === 'resource' && !newMaterial.resource_id) return;
+
+          const insertData = newMaterial.type === 'link' 
+            ? { task_id: task.id, external_title: newMaterial.title, external_url: newMaterial.url, sort_order: materials.length }
+            : { task_id: task.id, resource_id: newMaterial.resource_id, sort_order: materials.length };
+          
+          await supabase.from('task_materials').insert(insertData);
           await fetchMaterials();
-          setNewMaterial({ type: 'link', title: '', url: '' });
-          setSaving(false);
+          setNewMaterial({ type: 'link', title: '', url: '', resource_id: '' });
           onUpdate();
         };
 
@@ -184,23 +366,34 @@
               </div>
 
               <div style={{marginBottom:'24px'}}>
-                <div style={{fontSize:'14px',fontWeight:'500',marginBottom:'12px',color:'#374151'}}>添加资料链接</div>
-                <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-                  <input type="text" placeholder="资料标题（如：公司介绍视频）" value={newMaterial.title} onChange={e => setNewMaterial({...newMaterial, title: e.target.value})} style={{padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/>
-                  <input type="url" placeholder="资料链接（https://...）" value={newMaterial.url} onChange={e => setNewMaterial({...newMaterial, url: e.target.value})} style={{padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/>
-                  <button onClick={handleAdd} disabled={saving || !newMaterial.title || !newMaterial.url} className="btn-primary" style={{opacity:(saving || !newMaterial.title || !newMaterial.url)?0.5:1}}>{saving ? '添加中...' : '添加资料'}</button>
+                <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}>
+                  <button onClick={() => setNewMaterial({...newMaterial, type: 'link'})} style={{flex:1,padding:'10px',borderRadius:'8px',border:newMaterial.type==='link'?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:newMaterial.type==='link'?'#f0fdfa':'white',color:newMaterial.type==='link'?'#0d9488':'#6b7280',fontSize:'14px',cursor:'pointer'}}>添加链接</button>
+                  <button onClick={() => setNewMaterial({...newMaterial, type: 'resource'})} style={{flex:1,padding:'10px',borderRadius:'8px',border:newMaterial.type==='resource'?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:newMaterial.type==='resource'?'#f0fdfa':'white',color:newMaterial.type==='resource'?'#0d9488':'#6b7280',fontSize:'14px',cursor:'pointer'}}>从资料库选择</button>
                 </div>
+
+                {newMaterial.type === 'link' ? (
+                  <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+                    <input type="text" placeholder="资料标题" value={newMaterial.title} onChange={e => setNewMaterial({...newMaterial, title: e.target.value})} style={{padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/>
+                    <input type="url" placeholder="资料链接 https://..." value={newMaterial.url} onChange={e => setNewMaterial({...newMaterial, url: e.target.value})} style={{padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/>
+                  </div>
+                ) : (
+                  <select value={newMaterial.resource_id} onChange={e => setNewMaterial({...newMaterial, resource_id: e.target.value})} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',backgroundColor:'white'}}>
+                    <option value="">选择资料...</option>
+                    {resources.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
+                  </select>
+                )}
+                <button onClick={handleAdd} className="btn-primary" style={{width:'100%',marginTop:'12px'}}>添加资料</button>
               </div>
 
               <div>
-                <div style={{fontSize:'14px',fontWeight:'500',marginBottom:'12px',color:'#374151'}}>已添加的资料 ({materials.length})</div>
-                {loading ? <div style={{textAlign:'center',padding:'20px',color:'#9ca3af'}}><Icons.Spinner/></div> : materials.length === 0 ? <div style={{textAlign:'center',padding:'30px',color:'#9ca3af',backgroundColor:'#f9fafb',borderRadius:'10px'}}>暂无资料</div> : (
+                <div style={{fontSize:'14px',fontWeight:'500',marginBottom:'12px'}}>已添加 ({materials.length})</div>
+                {loading ? <div style={{textAlign:'center',padding:'20px'}}><Icons.Spinner/></div> : materials.length === 0 ? <div style={{textAlign:'center',padding:'30px',color:'#9ca3af',backgroundColor:'#f9fafb',borderRadius:'10px'}}>暂无资料</div> : (
                   <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-                    {materials.map((m, i) => (
+                    {materials.map(m => (
                       <div key={m.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',backgroundColor:'#f9fafb',borderRadius:'10px'}}>
                         <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
                           <div style={{width:'32px',height:'32px',borderRadius:'8px',backgroundColor:'#dbeafe',display:'flex',alignItems:'center',justifyContent:'center',color:'#3b82f6'}}><Icons.Link/></div>
-                          <div><div style={{fontWeight:'500',fontSize:'14px'}}>{m.external_title}</div><a href={m.external_url} target="_blank" style={{fontSize:'12px',color:'#6b7280',textDecoration:'none'}}>{m.external_url?.substring(0, 40)}...</a></div>
+                          <div><div style={{fontWeight:'500',fontSize:'14px'}}>{m.external_title || '资料库资料'}</div>{m.external_url && <a href={m.external_url} target="_blank" style={{fontSize:'12px',color:'#6b7280'}}>{m.external_url?.substring(0, 35)}...</a>}</div>
                         </div>
                         <button onClick={() => handleDelete(m.id)} className="btn-icon" style={{backgroundColor:'#fef2f2',color:'#ef4444'}}><Icons.Delete/></button>
                       </div>
@@ -213,12 +406,13 @@
         );
       };
 
-      // ==================== QUIZ MODAL ====================
+      // ==================== QUIZ MODAL (Admin) ====================
       const QuizModal = ({ task, supabase, onClose, onUpdate }) => {
         const [questions, setQuestions] = useState([]);
         const [loading, setLoading] = useState(true);
         const [editingQuestion, setEditingQuestion] = useState(null);
         const [showForm, setShowForm] = useState(false);
+        const [showBulkUpload, setShowBulkUpload] = useState(false);
 
         useEffect(() => { fetchQuestions(); }, []);
 
@@ -240,8 +434,17 @@
           onUpdate();
         };
 
+        const handleBulkUpload = async (questionsData) => {
+          for (let i = 0; i < questionsData.length; i++) {
+            await supabase.from('quiz_questions').insert({ task_id: task.id, ...questionsData[i], sort_order: questions.length + i });
+          }
+          await fetchQuestions();
+          setShowBulkUpload(false);
+          onUpdate();
+        };
+
         const handleDelete = async (id) => {
-          if (!confirm('确定删除此题目？')) return;
+          if (!confirm('确定删除？')) return;
           await supabase.from('quiz_questions').delete().eq('id', id);
           await fetchQuestions();
           onUpdate();
@@ -249,37 +452,160 @@
 
         return (
           <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{width:'640px'}} onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{width:'700px'}} onClick={e => e.stopPropagation()}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'24px'}}>
                 <h3 style={{fontSize:'20px',fontWeight:'600',margin:0}}>管理考核题目</h3>
                 <button onClick={onClose} className="btn-icon" style={{backgroundColor:'#f3f4f6',color:'#6b7280'}}><Icons.X/></button>
               </div>
 
-              {!showForm ? (
+              {!showForm && !showBulkUpload ? (
                 <>
-                  <button onClick={() => { setShowForm(true); setEditingQuestion(null); }} className="btn-primary" style={{width:'100%',marginBottom:'20px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}><Icons.Plus/>添加选择题</button>
+                  <div style={{display:'flex',gap:'12px',marginBottom:'20px'}}>
+                    <button onClick={() => setShowForm(true)} className="btn-primary" style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}><Icons.Plus/>添加单题</button>
+                    <button onClick={() => setShowBulkUpload(true)} className="btn-secondary" style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}><Icons.Upload/>批量上传</button>
+                  </div>
                   
-                  <div style={{fontSize:'14px',fontWeight:'500',marginBottom:'12px'}}>已添加的题目 ({questions.length})</div>
+                  <div style={{fontSize:'14px',fontWeight:'500',marginBottom:'12px'}}>已添加 ({questions.length})</div>
                   {loading ? <div style={{textAlign:'center',padding:'20px'}}><Icons.Spinner/></div> : questions.length === 0 ? <div style={{textAlign:'center',padding:'30px',color:'#9ca3af',backgroundColor:'#f9fafb',borderRadius:'10px'}}>暂无题目</div> : (
-                    <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+                    <div style={{display:'flex',flexDirection:'column',gap:'12px',maxHeight:'400px',overflowY:'auto'}}>
                       {questions.map((q, i) => (
                         <div key={q.id} style={{padding:'16px',backgroundColor:'#f9fafb',borderRadius:'12px'}}>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'12px'}}>
-                            <div style={{display:'flex',gap:'8px'}}><span style={{backgroundColor:'#0d9488',color:'white',padding:'2px 8px',borderRadius:'4px',fontSize:'12px',fontWeight:'600'}}>{i+1}</span><span style={{backgroundColor:'#dbeafe',color:'#3b82f6',padding:'2px 8px',borderRadius:'4px',fontSize:'12px'}}>{q.question_type === 'single' ? '单选' : '多选'}</span><span style={{backgroundColor:'#fef3c7',color:'#d97706',padding:'2px 8px',borderRadius:'4px',fontSize:'12px'}}>{q.points}分</span></div>
-                            <div style={{display:'flex',gap:'8px'}}><button onClick={() => { setEditingQuestion(q); setShowForm(true); }} className="btn-icon" style={{backgroundColor:'#f3f4f6',color:'#6b7280'}}><Icons.Edit/></button><button onClick={() => handleDelete(q.id)} className="btn-icon" style={{backgroundColor:'#fef2f2',color:'#ef4444'}}><Icons.Delete/></button></div>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'8px'}}>
+                            <div style={{display:'flex',gap:'8px',alignItems:'center'}}><span style={{backgroundColor:'#0d9488',color:'white',padding:'2px 8px',borderRadius:'4px',fontSize:'12px',fontWeight:'600'}}>{i+1}</span><span style={{backgroundColor:'#dbeafe',color:'#3b82f6',padding:'2px 8px',borderRadius:'4px',fontSize:'12px'}}>{q.question_type === 'single' ? '单选' : '多选'}</span><span style={{backgroundColor:'#fef3c7',color:'#d97706',padding:'2px 8px',borderRadius:'4px',fontSize:'12px'}}>{q.points}分</span></div>
+                            <div style={{display:'flex',gap:'8px'}}><button onClick={() => { setEditingQuestion(q); setShowForm(true); }} className="btn-icon" style={{backgroundColor:'white',color:'#6b7280'}}><Icons.Edit/></button><button onClick={() => handleDelete(q.id)} className="btn-icon" style={{backgroundColor:'#fef2f2',color:'#ef4444'}}><Icons.Delete/></button></div>
                           </div>
-                          <div style={{fontWeight:'500',marginBottom:'8px'}}>{q.question_text}</div>
-                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
-                            {q.options?.map(opt => (<div key={opt.id} style={{padding:'8px 12px',borderRadius:'6px',fontSize:'13px',backgroundColor:q.correct_answers?.includes(opt.id)?'#d1fae5':'white',border:'1px solid #e5e7eb',color:q.correct_answers?.includes(opt.id)?'#059669':'#374151'}}><span style={{fontWeight:'500'}}>{opt.id}.</span> {opt.text} {q.correct_answers?.includes(opt.id) && <Icons.CheckCircle/>}</div>))}
-                          </div>
+                          <div style={{fontWeight:'500',fontSize:'14px'}}>{q.question_text}</div>
                         </div>
                       ))}
                     </div>
                   )}
                 </>
+              ) : showBulkUpload ? (
+                <BulkUploadForm onUpload={handleBulkUpload} onCancel={() => setShowBulkUpload(false)}/>
               ) : (
                 <QuestionForm question={editingQuestion} onSave={handleSave} onCancel={() => { setShowForm(false); setEditingQuestion(null); }}/>
               )}
+            </div>
+          </div>
+        );
+      };
+
+      // ==================== BULK UPLOAD FORM ====================
+      const BulkUploadForm = ({ onUpload, onCancel }) => {
+        const [text, setText] = useState('');
+        const [parsed, setParsed] = useState([]);
+        const [error, setError] = useState('');
+
+        const template = `1. 公司成立于哪一年？[单选]
+A. 2018年
+B. 2019年
+C. 2020年
+D. 2021年
+答案: B
+
+2. 以下哪些是公司的核心价值观？[多选]
+A. 诚信
+B. 创新
+C. 专业
+D. 服务
+答案: A,B,C,D`;
+
+        const parseQuestions = (input) => {
+          setError('');
+          const questions = [];
+          const blocks = input.trim().split(/\n\s*\n/);
+
+          for (const block of blocks) {
+            if (!block.trim()) continue;
+            const lines = block.trim().split('\n');
+            
+            // Parse question
+            const questionMatch = lines[0].match(/^\d+\.\s*(.+?)(?:\[(.+?)\])?$/);
+            if (!questionMatch) continue;
+            
+            const questionText = questionMatch[1].trim();
+            const typeHint = questionMatch[2]?.trim().toLowerCase();
+            const isMultiple = typeHint?.includes('多选');
+
+            // Parse options
+            const options = [];
+            let answerLine = '';
+            
+            for (let i = 1; i < lines.length; i++) {
+              const optMatch = lines[i].match(/^([A-D])[.、]\s*(.+)$/);
+              if (optMatch) {
+                options.push({ id: optMatch[1], text: optMatch[2].trim() });
+              }
+              if (lines[i].startsWith('答案')) {
+                answerLine = lines[i];
+              }
+            }
+
+            // Parse answer
+            const answerMatch = answerLine.match(/答案[:：]\s*([A-D,，]+)/);
+            if (!answerMatch) continue;
+            
+            const correctAnswers = answerMatch[1].replace(/，/g, ',').split(',').map(a => a.trim());
+
+            if (options.length >= 2 && correctAnswers.length > 0) {
+              questions.push({
+                question_text: questionText,
+                question_type: isMultiple || correctAnswers.length > 1 ? 'multiple' : 'single',
+                options,
+                correct_answers: correctAnswers,
+                points: 10
+              });
+            }
+          }
+
+          if (questions.length === 0 && input.trim()) {
+            setError('未能解析任何题目，请检查格式');
+          }
+          setParsed(questions);
+        };
+
+        const handleDownloadTemplate = () => {
+          const blob = new Blob([template], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = '考核题目模版.txt';
+          a.click();
+        };
+
+        return (
+          <div>
+            <div style={{marginBottom:'16px',padding:'16px',backgroundColor:'#f0fdfa',borderRadius:'10px',border:'1px solid #99f6e4'}}>
+              <div style={{fontWeight:'600',color:'#0d9488',marginBottom:'8px'}}>📝 批量上传格式说明</div>
+              <div style={{fontSize:'13px',color:'#6b7280',lineHeight:'1.8'}}>
+                <div>• 每题以数字编号开头，如 "1. 题目内容"</div>
+                <div>• 可在题目后标注[单选]或[多选]</div>
+                <div>• 选项以A.B.C.D.开头</div>
+                <div>• 答案行格式：答案: A 或 答案: A,B,C</div>
+                <div>• 题目之间用空行分隔</div>
+              </div>
+              <button onClick={handleDownloadTemplate} style={{marginTop:'12px',display:'flex',alignItems:'center',gap:'6px',color:'#0d9488',background:'none',border:'none',cursor:'pointer',fontSize:'13px',fontWeight:'500'}}><Icons.Download/>下载模版文件</button>
+            </div>
+
+            <div style={{marginBottom:'16px'}}>
+              <label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>粘贴题目内容</label>
+              <textarea value={text} onChange={e => { setText(e.target.value); parseQuestions(e.target.value); }} placeholder={template} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'13px',minHeight:'200px',fontFamily:'monospace',resize:'vertical'}}/>
+            </div>
+
+            {error && <div style={{padding:'12px',backgroundColor:'#fef2f2',color:'#dc2626',borderRadius:'8px',marginBottom:'16px',fontSize:'13px'}}>{error}</div>}
+
+            {parsed.length > 0 && (
+              <div style={{marginBottom:'16px',padding:'12px',backgroundColor:'#f9fafb',borderRadius:'10px'}}>
+                <div style={{fontWeight:'500',marginBottom:'8px'}}>✅ 已解析 {parsed.length} 道题目：</div>
+                <div style={{fontSize:'13px',color:'#6b7280',maxHeight:'150px',overflowY:'auto'}}>
+                  {parsed.map((q, i) => (<div key={i} style={{padding:'4px 0'}}>{i+1}. {q.question_text.substring(0, 40)}... [{q.question_type === 'single' ? '单选' : '多选'}]</div>))}
+                </div>
+              </div>
+            )}
+
+            <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}>
+              <button onClick={onCancel} className="btn-secondary">取消</button>
+              <button onClick={() => onUpload(parsed)} disabled={parsed.length === 0} className="btn-primary">{parsed.length > 0 ? `上传 ${parsed.length} 道题目` : '上传'}</button>
             </div>
           </div>
         );
@@ -294,14 +620,11 @@
           correct_answers: question?.correct_answers || [],
           points: question?.points || 10
         });
-        const [saving, setSaving] = useState(false);
 
         const handleSubmit = async (e) => {
           e.preventDefault();
           if (!form.question_text || form.correct_answers.length === 0) { alert('请填写题目并选择正确答案'); return; }
-          setSaving(true);
           await onSave({ id: question?.id, ...form });
-          setSaving(false);
         };
 
         const toggleAnswer = (optId) => {
@@ -323,7 +646,7 @@
 
             <div style={{marginBottom:'16px'}}>
               <label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>题目内容 *</label>
-              <textarea value={form.question_text} onChange={e => setForm({...form, question_text: e.target.value})} placeholder="请输入题目内容" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',minHeight:'80px',resize:'vertical'}} required/>
+              <textarea value={form.question_text} onChange={e => setForm({...form, question_text: e.target.value})} placeholder="请输入题目" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',minHeight:'80px',resize:'vertical'}} required/>
             </div>
 
             <div style={{marginBottom:'16px'}}>
@@ -336,29 +659,29 @@
                   </div>
                 ))}
               </div>
-              <div style={{fontSize:'12px',color:'#9ca3af',marginTop:'8px'}}>{form.question_type === 'single' ? '点击字母选择唯一正确答案' : '点击字母选择所有正确答案'}</div>
             </div>
 
             <div style={{marginBottom:'20px'}}>
               <label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>分值</label>
-              <input type="number" value={form.points} onChange={e => setForm({...form, points: parseInt(e.target.value) || 10})} min="1" max="100" style={{width:'100px',padding:'10px 12px',borderRadius:'8px',border:'1px solid #e5e7eb',fontSize:'14px'}}/>
+              <input type="number" value={form.points} onChange={e => setForm({...form, points: parseInt(e.target.value) || 10})} min="1" max="100" style={{width:'100px',padding:'10px',borderRadius:'8px',border:'1px solid #e5e7eb',fontSize:'14px'}}/>
             </div>
 
             <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}>
               <button type="button" onClick={onCancel} className="btn-secondary">取消</button>
-              <button type="submit" disabled={saving} className="btn-primary" style={{opacity:saving?0.7:1}}>{saving ? '保存中...' : '保存题目'}</button>
+              <button type="submit" className="btn-primary">保存</button>
             </div>
           </form>
         );
       };
 
       // ==================== QUIZ TAKING (Employee) ====================
-      const QuizTaking = ({ task, supabase, currentUser, onClose, onComplete }) => {
+      const QuizTaking = ({ task, supabase, currentUser, onClose, onComplete, isReview }) => {
         const [questions, setQuestions] = useState([]);
         const [answers, setAnswers] = useState({});
         const [loading, setLoading] = useState(true);
         const [submitting, setSubmitting] = useState(false);
         const [result, setResult] = useState(null);
+        const [showFireworks, setShowFireworks] = useState(false);
 
         useEffect(() => {
           const fetch = async () => {
@@ -370,6 +693,7 @@
         }, []);
 
         const handleSelect = (qId, optId, isMultiple) => {
+          if (isReview) return;
           if (isMultiple) {
             const current = answers[qId] || [];
             setAnswers({ ...answers, [qId]: current.includes(optId) ? current.filter(a => a !== optId) : [...current, optId] });
@@ -390,47 +714,58 @@
             if (userAns === correctAns) score += q.points;
           });
 
-          const passed = score >= totalPoints * 0.6;
+          const passed = score === totalPoints; // Must be 100%
           await supabase.from('quiz_attempts').insert({ user_id: currentUser.id, task_id: task.id, answers, score, total_points: totalPoints, passed });
           
           setResult({ score, totalPoints, passed, percentage: Math.round((score / totalPoints) * 100) });
+          if (passed) {
+            setShowFireworks(true);
+            onComplete();
+          }
           setSubmitting(false);
-          if (passed) onComplete();
         };
 
         if (loading) return <div className="modal-overlay"><div className="modal-content" style={{width:'600px',textAlign:'center',padding:'60px'}}><Icons.Spinner/><p style={{marginTop:'12px',color:'#6b7280'}}>加载题目...</p></div></div>;
 
         if (result) return (
-          <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{width:'400px',textAlign:'center'}} onClick={e => e.stopPropagation()}>
-              <div style={{width:'80px',height:'80px',borderRadius:'50%',backgroundColor:result.passed?'#d1fae5':'#fee2e2',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px',fontSize:'32px'}}>{result.passed ? '✓' : '✗'}</div>
-              <h3 style={{fontSize:'24px',fontWeight:'700',marginBottom:'8px',color:result.passed?'#059669':'#dc2626'}}>{result.passed ? '恭喜通过！' : '未通过'}</h3>
-              <p style={{fontSize:'48px',fontWeight:'700',color:'#1f2937',marginBottom:'8px'}}>{result.percentage}%</p>
-              <p style={{color:'#6b7280',marginBottom:'24px'}}>得分: {result.score} / {result.totalPoints}</p>
-              <button onClick={onClose} className="btn-primary" style={{width:'100%'}}>{result.passed ? '完成' : '关闭'}</button>
+          <>
+            <Fireworks show={showFireworks} onComplete={() => setShowFireworks(false)}/>
+            <div className="modal-overlay" onClick={onClose}>
+              <div className="modal-content" style={{width:'420px',textAlign:'center'}} onClick={e => e.stopPropagation()}>
+                <div style={{width:'100px',height:'100px',borderRadius:'50%',backgroundColor:result.passed?'#d1fae5':'#fee2e2',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 24px',fontSize:'48px'}}>{result.passed ? '🎉' : '😅'}</div>
+                <h3 style={{fontSize:'28px',fontWeight:'700',marginBottom:'8px',color:result.passed?'#059669':'#dc2626'}}>{result.passed ? '🎊 恭喜通过！' : '继续加油！'}</h3>
+                <p style={{fontSize:'56px',fontWeight:'700',color:'#1f2937',marginBottom:'8px'}}>{result.percentage}<span style={{fontSize:'24px'}}>分</span></p>
+                <p style={{color:'#6b7280',marginBottom:'24px'}}>
+                  {result.passed ? '你已完美完成本次考核！' : `需要100分才能通过，你还差 ${result.totalPoints - result.score} 分`}
+                </p>
+                <button onClick={onClose} className="btn-primary" style={{width:'100%',padding:'14px',fontSize:'16px'}}>{result.passed ? '太棒了！' : '再试一次'}</button>
+              </div>
             </div>
-          </div>
+          </>
         );
 
         return (
           <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{width:'700px',maxHeight:'85vh'}} onClick={e => e.stopPropagation()}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'24px',position:'sticky',top:0,backgroundColor:'white',paddingBottom:'16px',borderBottom:'1px solid #e5e7eb'}}>
-                <div><h3 style={{fontSize:'20px',fontWeight:'600',margin:0}}>考核测试</h3><p style={{fontSize:'14px',color:'#6b7280',margin:'4px 0 0'}}>共 {questions.length} 题，及格线 60%</p></div>
+            <div className="modal-content" style={{width:'720px',maxHeight:'85vh'}} onClick={e => e.stopPropagation()}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'24px',position:'sticky',top:0,backgroundColor:'white',paddingBottom:'16px',borderBottom:'1px solid #e5e7eb',zIndex:10}}>
+                <div><h3 style={{fontSize:'20px',fontWeight:'600',margin:0}}>{isReview ? '📖 复习模式' : '📝 考核测试'}</h3><p style={{fontSize:'14px',color:'#6b7280',margin:'4px 0 0'}}>{isReview ? '查看正确答案' : `共 ${questions.length} 题，需全部答对(100分)通过`}</p></div>
                 <button onClick={onClose} className="btn-icon" style={{backgroundColor:'#f3f4f6',color:'#6b7280'}}><Icons.X/></button>
               </div>
 
               <div style={{display:'flex',flexDirection:'column',gap:'24px'}}>
                 {questions.map((q, i) => (
                   <div key={q.id} style={{padding:'20px',backgroundColor:'#f9fafb',borderRadius:'12px'}}>
-                    <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}><span style={{backgroundColor:'#0d9488',color:'white',padding:'4px 10px',borderRadius:'6px',fontSize:'13px',fontWeight:'600'}}>第 {i+1} 题</span><span style={{backgroundColor:'#dbeafe',color:'#3b82f6',padding:'4px 10px',borderRadius:'6px',fontSize:'13px'}}>{q.question_type === 'single' ? '单选' : '多选'}</span><span style={{backgroundColor:'#fef3c7',color:'#d97706',padding:'4px 10px',borderRadius:'6px',fontSize:'13px'}}>{q.points}分</span></div>
+                    <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}><span style={{backgroundColor:'#0d9488',color:'white',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:'600'}}>第 {i+1} 题</span><span style={{backgroundColor:'#dbeafe',color:'#3b82f6',padding:'4px 12px',borderRadius:'6px',fontSize:'13px'}}>{q.question_type === 'single' ? '单选' : '多选'}</span><span style={{backgroundColor:'#fef3c7',color:'#d97706',padding:'4px 12px',borderRadius:'6px',fontSize:'13px'}}>{q.points}分</span></div>
                     <div style={{fontSize:'16px',fontWeight:'500',marginBottom:'16px',lineHeight:'1.6'}}>{q.question_text}</div>
                     <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
                       {q.options?.map(opt => {
                         const selected = (answers[q.id] || []).includes(opt.id);
-                        return (<div key={opt.id} onClick={() => handleSelect(q.id, opt.id, q.question_type === 'multiple')} style={{padding:'14px 16px',borderRadius:'10px',border:selected?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:selected?'#f0fdfa':'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'12px'}}>
-                          <div style={{width:'28px',height:'28px',borderRadius:q.question_type==='single'?'50%':'6px',backgroundColor:selected?'#0d9488':'#f3f4f6',color:selected?'white':'#6b7280',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'600',fontSize:'13px'}}>{opt.id}</div>
-                          <span style={{color:selected?'#0d9488':'#374151'}}>{opt.text}</span>
+                        const isCorrect = q.correct_answers?.includes(opt.id);
+                        const showCorrect = isReview && isCorrect;
+                        return (<div key={opt.id} onClick={() => handleSelect(q.id, opt.id, q.question_type === 'multiple')} style={{padding:'14px 16px',borderRadius:'10px',border:showCorrect?'2px solid #10b981':selected?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:showCorrect?'#d1fae5':selected?'#f0fdfa':'white',cursor:isReview?'default':'pointer',display:'flex',alignItems:'center',gap:'12px'}}>
+                          <div style={{width:'28px',height:'28px',borderRadius:q.question_type==='single'?'50%':'6px',backgroundColor:showCorrect?'#10b981':selected?'#0d9488':'#f3f4f6',color:showCorrect||selected?'white':'#6b7280',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'600',fontSize:'13px'}}>{opt.id}</div>
+                          <span style={{color:showCorrect?'#059669':selected?'#0d9488':'#374151',flex:1}}>{opt.text}</span>
+                          {showCorrect && <span style={{color:'#10b981'}}>✓ 正确答案</span>}
                         </div>);
                       })}
                     </div>
@@ -438,59 +773,93 @@
                 ))}
               </div>
 
-              <div style={{position:'sticky',bottom:0,backgroundColor:'white',paddingTop:'20px',borderTop:'1px solid #e5e7eb',marginTop:'24px'}}>
-                <button onClick={handleSubmit} disabled={submitting} className="btn-primary" style={{width:'100%',padding:'14px',fontSize:'16px',opacity:submitting?0.7:1}}>{submitting ? '提交中...' : '提交答卷'}</button>
-              </div>
+              {!isReview && (
+                <div style={{position:'sticky',bottom:0,backgroundColor:'white',paddingTop:'20px',borderTop:'1px solid #e5e7eb',marginTop:'24px'}}>
+                  <button onClick={handleSubmit} disabled={submitting} className="btn-primary" style={{width:'100%',padding:'14px',fontSize:'16px'}}>{submitting ? '提交中...' : '提交答卷'}</button>
+                </div>
+              )}
             </div>
           </div>
         );
       };
 
       // ==================== TRAINING TASK ====================
-      const TrainingTask = ({ task, isCompleted, onToggleComplete, onEdit, onDelete, isAdmin, supabase, onRefresh, currentUser }) => {
+      const TrainingTask = ({ task, isCompleted, onToggleComplete, onEdit, onDelete, isAdmin, supabase, onRefresh, currentUser, resources }) => {
         const [loading, setLoading] = useState(false);
         const [showMaterials, setShowMaterials] = useState(false);
         const [showQuiz, setShowQuiz] = useState(false);
         const [showQuizTaking, setShowQuizTaking] = useState(false);
+        const [showReview, setShowReview] = useState(false);
         const [materials, setMaterials] = useState([]);
         const [quizCount, setQuizCount] = useState(0);
+
+        const isQuizTask = !task.is_self_complete;
 
         useEffect(() => {
           const fetch = async () => {
             const { data: mats } = await supabase.from('task_materials').select('*').eq('task_id', task.id);
-            const { data: quizzes, count } = await supabase.from('quiz_questions').select('*', { count: 'exact' }).eq('task_id', task.id);
+            const { count } = await supabase.from('quiz_questions').select('*', { count: 'exact', head: true }).eq('task_id', task.id);
             setMaterials(mats || []);
             setQuizCount(count || 0);
           };
           fetch();
         }, [task.id]);
 
-        const handleToggle = async () => { setLoading(true); await onToggleComplete(task.id); setLoading(false); };
+        const handleToggle = async () => {
+          if (isQuizTask && !isCompleted) {
+            // Quiz task - must take quiz
+            setShowQuizTaking(true);
+          } else {
+            // Self-complete task or already completed
+            setLoading(true);
+            await onToggleComplete(task.id);
+            setLoading(false);
+          }
+        };
+
+        const handleQuizComplete = async () => {
+          await onToggleComplete(task.id);
+          onRefresh();
+        };
 
         return (
           <>
-            <div style={{backgroundColor:'#fff',borderRadius:'12px',padding:'16px 20px',marginBottom:'12px',border:'1px solid #e8e8e8'}}>
+            <div style={{backgroundColor:'#fff',borderRadius:'12px',padding:'16px 20px',marginBottom:'12px',border:isCompleted?'1px solid #a7f3d0':'1px solid #e8e8e8',backgroundColor:isCompleted?'#f0fdf4':'white'}}>
               <div style={{display:'flex',alignItems:'flex-start',gap:'12px'}}>
-                <div onClick={handleToggle} style={{width:'22px',height:'22px',borderRadius:'50%',backgroundColor:isCompleted?'#10b981':'transparent',border:isCompleted?'none':'2px solid #d1d5db',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',marginTop:'2px',flexShrink:0}}>{loading ? <Icons.Spinner/> : isCompleted && <Icons.Check/>}</div>
+                {/* Checkbox / Quiz Button */}
+                {isQuizTask && !isCompleted ? (
+                  <div style={{width:'22px',height:'22px',borderRadius:'50%',border:'2px solid #f97316',display:'flex',alignItems:'center',justifyContent:'center',marginTop:'2px',flexShrink:0}}>
+                    <div style={{width:'8px',height:'8px',borderRadius:'50%',backgroundColor:'#f97316'}}/>
+                  </div>
+                ) : (
+                  <div onClick={handleToggle} style={{width:'22px',height:'22px',borderRadius:'50%',backgroundColor:isCompleted?'#10b981':'transparent',border:isCompleted?'none':'2px solid #d1d5db',display:'flex',alignItems:'center',justifyContent:'center',cursor:task.is_self_complete||isCompleted?'pointer':'default',marginTop:'2px',flexShrink:0}}>{loading ? <Icons.Spinner/> : isCompleted && <Icons.Check/>}</div>
+                )}
+                
                 <div style={{flex:1}}>
-                  <div style={{fontSize:'15px',fontWeight:'500',color:'#1f2937',marginBottom:'10px',textDecoration:isCompleted?'line-through':'none',opacity:isCompleted?0.7:1}}>{task.title}</div>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                    <span style={{fontSize:'15px',fontWeight:'500',color:isCompleted?'#059669':'#1f2937',textDecoration:isCompleted?'line-through':'none'}}>{task.title}</span>
+                    <span style={{padding:'2px 8px',borderRadius:'4px',fontSize:'11px',fontWeight:'500',backgroundColor:isQuizTask?'#fef3c7':'#dbeafe',color:isQuizTask?'#d97706':'#3b82f6'}}>{isQuizTask ? '题目考核' : '自主完成'}</span>
+                    {isCompleted && <span style={{padding:'2px 8px',borderRadius:'4px',fontSize:'11px',fontWeight:'500',backgroundColor:'#d1fae5',color:'#059669'}}>✓ 已完成</span>}
+                  </div>
                   
-                  {/* Materials Section */}
+                  {/* Materials */}
                   {materials.length > 0 && (
-                    <div style={{marginBottom:'10px'}}>
-                      <div style={{fontSize:'13px',color:'#6b7280',marginBottom:'6px'}}>学习资料：</div>
-                      <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
-                        {materials.map(m => (<a key={m.id} href={m.external_url} target="_blank" style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',backgroundColor:'#f0f9ff',borderRadius:'6px',fontSize:'13px',color:'#0369a1',textDecoration:'none'}}><Icons.Link/>{m.external_title}</a>))}
-                      </div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'10px'}}>
+                      {materials.map(m => (<a key={m.id} href={m.external_url} target="_blank" style={{display:'flex',alignItems:'center',gap:'4px',padding:'4px 10px',backgroundColor:'#f0f9ff',borderRadius:'6px',fontSize:'12px',color:'#0369a1',textDecoration:'none'}}><Icons.Link/>{m.external_title}</a>))}
                     </div>
                   )}
 
+                  {/* Actions */}
                   <div style={{display:'flex',gap:'12px',flexWrap:'wrap',alignItems:'center'}}>
-                    {materials.length > 0 && <div style={{display:'flex',alignItems:'center',gap:'4px',color:'#6b7280',fontSize:'13px'}}><Icons.Document/><span>{materials.length} 份资料</span></div>}
-                    {quizCount > 0 && (
-                      <button onClick={() => setShowQuizTaking(true)} style={{display:'flex',alignItems:'center',gap:'4px',color:'#f97316',fontSize:'13px',background:'none',border:'none',cursor:'pointer',padding:0}}><Icons.Quiz/><span>{quizCount} 题考核</span><span style={{backgroundColor:'#fff7ed',padding:'2px 6px',borderRadius:'4px',marginLeft:'4px'}}>开始答题</span></button>
+                    {materials.length > 0 && <span style={{fontSize:'13px',color:'#6b7280'}}><Icons.Document/> {materials.length} 份资料</span>}
+                    
+                    {isQuizTask && quizCount > 0 && (
+                      isCompleted ? (
+                        <button onClick={() => setShowReview(true)} style={{display:'flex',alignItems:'center',gap:'4px',color:'#10b981',fontSize:'13px',background:'none',border:'none',cursor:'pointer',padding:0}}><Icons.Eye/>回顾考核题目</button>
+                      ) : (
+                        <button onClick={() => setShowQuizTaking(true)} style={{display:'flex',alignItems:'center',gap:'4px',color:'#f97316',fontSize:'13px',background:'none',border:'none',cursor:'pointer',padding:0,fontWeight:'500'}}><Icons.Quiz/>{quizCount} 题考核 <span style={{backgroundColor:'#fff7ed',padding:'2px 8px',borderRadius:'4px',marginLeft:'4px'}}>开始答题</span></button>
+                      )
                     )}
-                    {task.is_self_complete && <div style={{display:'flex',alignItems:'center',gap:'4px',color:'#10b981',fontSize:'13px'}}><Icons.CheckCircle/><span>自主完成</span></div>}
                   </div>
                 </div>
 
@@ -505,15 +874,16 @@
               </div>
             </div>
 
-            {showMaterials && <MaterialsModal task={task} supabase={supabase} onClose={() => setShowMaterials(false)} onUpdate={onRefresh}/>}
+            {showMaterials && <MaterialsModal task={task} supabase={supabase} resources={resources} onClose={() => setShowMaterials(false)} onUpdate={onRefresh}/>}
             {showQuiz && <QuizModal task={task} supabase={supabase} onClose={() => setShowQuiz(false)} onUpdate={onRefresh}/>}
-            {showQuizTaking && <QuizTaking task={task} supabase={supabase} currentUser={currentUser} onClose={() => setShowQuizTaking(false)} onComplete={() => { setShowQuizTaking(false); onToggleComplete(task.id); }}/>}
+            {showQuizTaking && <QuizTaking task={task} supabase={supabase} currentUser={currentUser} onClose={() => setShowQuizTaking(false)} onComplete={handleQuizComplete} isReview={false}/>}
+            {showReview && <QuizTaking task={task} supabase={supabase} currentUser={currentUser} onClose={() => setShowReview(false)} onComplete={() => {}} isReview={true}/>}
           </>
         );
       };
 
       // ==================== DAY MODULE ====================
-      const DayModule = ({ module, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, isAdmin, supabase, onRefresh, currentUser }) => {
+      const DayModule = ({ module, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, isAdmin, supabase, onRefresh, currentUser, resources }) => {
         const [isExpanded, setIsExpanded] = useState(true);
         return (
           <div style={{marginBottom:'24px'}}>
@@ -526,7 +896,7 @@
             </div>
             {isExpanded && (
               <div style={{marginLeft:'4px'}}>
-                {module.training_tasks?.map(task => <TrainingTask key={task.id} task={task} isCompleted={userProgress?.find(p => p.task_id === task.id)?.is_completed || false} onToggleComplete={onToggleComplete} onEdit={onEditTask} onDelete={onDeleteTask} isAdmin={isAdmin} supabase={supabase} onRefresh={onRefresh} currentUser={currentUser}/>)}
+                {module.training_tasks?.map(task => <TrainingTask key={task.id} task={task} isCompleted={userProgress?.find(p => p.task_id === task.id)?.is_completed || false} onToggleComplete={onToggleComplete} onEdit={onEditTask} onDelete={onDeleteTask} isAdmin={isAdmin} supabase={supabase} onRefresh={onRefresh} currentUser={currentUser} resources={resources}/>)}
                 {isAdmin && <button onClick={() => onAddTask(module.id)} style={{display:'flex',alignItems:'center',gap:'8px',padding:'12px 16px',borderRadius:'10px',border:'2px dashed #d1d5db',backgroundColor:'transparent',color:'#6b7280',fontSize:'14px',cursor:'pointer',width:'100%',justifyContent:'center'}}><Icons.Plus/>添加任务</button>}
               </div>
             )}
@@ -536,17 +906,35 @@
 
       // ==================== TASK MODAL ====================
       const TaskModal = ({ task, moduleId, onSave, onClose }) => {
-        const [form, setForm] = useState({ title: task?.title || '', materials_count: task?.materials_count || 0, quiz_count: task?.quiz_count || 0, is_self_complete: task?.is_self_complete || false });
+        const [form, setForm] = useState({ title: task?.title || '', is_self_complete: task?.is_self_complete ?? true });
         const [saving, setSaving] = useState(false);
         const handleSubmit = async (e) => { e.preventDefault(); setSaving(true); await onSave({ ...form, id: task?.id, module_id: moduleId }); setSaving(false); onClose(); };
         return (
           <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content" style={{width:'500px'}} onClick={e => e.stopPropagation()}>
-              <h3 style={{margin:'0 0 20px',fontSize:'18px',fontWeight:'600'}}>{task ? '编辑任务' : '添加任务'}</h3>
+              <h3 style={{margin:'0 0 24px',fontSize:'20px',fontWeight:'600'}}>{task ? '编辑任务' : '添加任务'}</h3>
               <form onSubmit={handleSubmit}>
-                <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>任务标题</label><textarea value={form.title} onChange={e => setForm({...form, title: e.target.value})} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',minHeight:'80px',resize:'vertical'}} required/></div>
-                <div style={{marginBottom:'20px'}}><label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer'}}><input type="checkbox" checked={form.is_self_complete} onChange={e => setForm({...form, is_self_complete: e.target.checked})} style={{width:'16px',height:'16px'}}/><span style={{fontSize:'14px'}}>自主完成任务</span></label></div>
-                <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary" style={{opacity:saving?0.7:1}}>{saving ? '保存中...' : '保存'}</button></div>
+                <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>任务标题 *</label><textarea value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="请输入任务标题" style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',minHeight:'80px',resize:'vertical'}} required/></div>
+                
+                <div style={{marginBottom:'24px'}}>
+                  <label style={{display:'block',marginBottom:'8px',fontSize:'14px',fontWeight:'500'}}>任务类型</label>
+                  <div style={{display:'flex',gap:'12px'}}>
+                    <label style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'16px',borderRadius:'12px',border:form.is_self_complete?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:form.is_self_complete?'#f0fdfa':'white',cursor:'pointer'}}>
+                      <input type="radio" name="type" checked={form.is_self_complete} onChange={() => setForm({...form, is_self_complete: true})} style={{display:'none'}}/>
+                      <Icons.CheckCircle/>
+                      <span style={{marginTop:'8px',fontWeight:'500',color:form.is_self_complete?'#0d9488':'#6b7280'}}>自主完成</span>
+                      <span style={{fontSize:'12px',color:'#9ca3af',marginTop:'4px',textAlign:'center'}}>员工可直接标记完成</span>
+                    </label>
+                    <label style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'16px',borderRadius:'12px',border:!form.is_self_complete?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:!form.is_self_complete?'#f0fdfa':'white',cursor:'pointer'}}>
+                      <input type="radio" name="type" checked={!form.is_self_complete} onChange={() => setForm({...form, is_self_complete: false})} style={{display:'none'}}/>
+                      <Icons.Quiz/>
+                      <span style={{marginTop:'8px',fontWeight:'500',color:!form.is_self_complete?'#0d9488':'#6b7280'}}>题目考核</span>
+                      <span style={{fontSize:'12px',color:'#9ca3af',marginTop:'4px',textAlign:'center'}}>需答题100分通过</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary">{saving ? '保存中...' : '保存'}</button></div>
               </form>
             </div>
           </div>
@@ -554,12 +942,12 @@
       };
 
       // ==================== TRAINING PAGE ====================
-      const TrainingPage = ({ departments, selectedDepartment, setSelectedDepartment, trainingModules, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, isAdmin, supabase, onRefresh, currentUser }) => (
+      const TrainingPage = ({ departments, selectedDepartment, setSelectedDepartment, trainingModules, userProgress, onToggleComplete, onEditTask, onDeleteTask, onAddTask, isAdmin, supabase, onRefresh, currentUser, resources }) => (
         <div>
-          <div style={{marginBottom:'32px'}}><div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}><Icons.Sparkles/><h1 style={{fontSize:'24px',fontWeight:'700',color:'#1f2937',margin:0}}>智能培训计划生成器 {isAdmin && '(管理员)'}</h1></div><p style={{fontSize:'15px',color:'#6b7280',margin:0}}>{isAdmin ? '管理培训内容、学习资料和考核题目' : '完成以下培训任务，开始你的职业之旅'}</p></div>
+          <div style={{marginBottom:'32px'}}><div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}><Icons.Sparkles/><h1 style={{fontSize:'24px',fontWeight:'700',color:'#1f2937',margin:0}}>智能培训计划 {isAdmin && '(管理员)'}</h1></div><p style={{fontSize:'15px',color:'#6b7280',margin:0}}>{isAdmin ? '管理培训内容、学习资料和考核题目' : '完成培训任务，开始你的职业之旅'}</p></div>
           <div style={{display:'grid',gridTemplateColumns:'280px 1fr',gap:'32px'}}>
             <div><div style={{fontSize:'14px',fontWeight:'600',color:'#374151',marginBottom:'12px'}}>目标部门 / 岗位</div><div style={{display:'flex',flexDirection:'column',gap:'8px'}}>{departments.map(dept => (<div key={dept.id} onClick={() => setSelectedDepartment(dept)} style={{padding:'14px 18px',borderRadius:'10px',border:selectedDepartment?.id===dept.id?'2px solid #14b8a6':'1px solid #e5e7eb',backgroundColor:selectedDepartment?.id===dept.id?'#f0fdfa':'#ffffff',color:selectedDepartment?.id===dept.id?'#0d9488':'#374151',fontWeight:selectedDepartment?.id===dept.id?'600':'500',fontSize:'15px',cursor:'pointer'}}>{dept.name}</div>))}</div></div>
-            <div><h2 style={{fontSize:'20px',fontWeight:'700',color:'#1f2937',marginBottom:'24px',paddingBottom:'16px',borderBottom:'2px solid #e5e7eb'}}>{selectedDepartment?.name || ''} - 入职培训日程</h2>{trainingModules.length === 0 ? <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}>暂无培训内容</div> : trainingModules.map(module => <DayModule key={module.id} module={module} userProgress={userProgress} onToggleComplete={onToggleComplete} onEditTask={onEditTask} onDeleteTask={onDeleteTask} onAddTask={onAddTask} isAdmin={isAdmin} supabase={supabase} onRefresh={onRefresh} currentUser={currentUser}/>)}</div>
+            <div><h2 style={{fontSize:'20px',fontWeight:'700',color:'#1f2937',marginBottom:'24px',paddingBottom:'16px',borderBottom:'2px solid #e5e7eb'}}>{selectedDepartment?.name || ''} - 入职培训日程</h2>{trainingModules.length === 0 ? <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}>暂无培训内容</div> : trainingModules.map(module => <DayModule key={module.id} module={module} userProgress={userProgress} onToggleComplete={onToggleComplete} onEditTask={onEditTask} onDeleteTask={onDeleteTask} onAddTask={onAddTask} isAdmin={isAdmin} supabase={supabase} onRefresh={onRefresh} currentUser={currentUser} resources={resources}/>)}</div>
           </div>
         </div>
       );
@@ -595,7 +983,7 @@
 
         return (
           <div>
-            <div style={{marginBottom:'32px'}}><div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}><Icons.Users/><h1 style={{fontSize:'24px',fontWeight:'700',color:'#1f2937',margin:0}}>账号管理</h1></div><p style={{fontSize:'15px',color:'#6b7280',margin:0}}>管理部门和员工账号信息</p></div>
+            <div style={{marginBottom:'32px'}}><div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}><Icons.Users/><h1 style={{fontSize:'24px',fontWeight:'700',color:'#1f2937',margin:0}}>账号管理</h1></div><p style={{fontSize:'15px',color:'#6b7280',margin:0}}>管理部门和员工账号</p></div>
             
             <div style={{display:'flex',gap:'8px',marginBottom:'24px',borderBottom:'2px solid #e5e7eb'}}>
               {['employees', 'departments'].map(t => (<button key={t} onClick={() => setActiveTab(t)} style={{padding:'12px 24px',fontSize:'15px',fontWeight:activeTab===t?'600':'500',color:activeTab===t?'#0d9488':'#6b7280',backgroundColor:'transparent',border:'none',borderBottom:activeTab===t?'2px solid #0d9488':'2px solid transparent',marginBottom:'-2px',cursor:'pointer'}}>{t==='employees'?'员工管理':'部门管理'}</button>))}
@@ -604,16 +992,16 @@
             {activeTab === 'employees' && (
               <div>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:'20px'}}>
-                  <div style={{position:'relative',width:'300px'}}><input type="text" placeholder="搜索员工..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{width:'100%',padding:'10px 12px 10px 40px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/></div>
+                  <div style={{position:'relative'}}><input type="text" placeholder="搜索员工..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{width:'280px',padding:'10px 12px 10px 40px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/><div style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#9ca3af'}}><Icons.Search/></div></div>
                   <button onClick={() => setModal({ open: true, type: 'user', data: null })} className="btn-primary" style={{display:'flex',alignItems:'center',gap:'8px'}}><Icons.Plus/>添加员工</button>
                 </div>
                 <div style={{backgroundColor:'white',borderRadius:'16px',border:'1px solid #e5e7eb',overflow:'hidden'}}>
                   <table style={{width:'100%',borderCollapse:'collapse'}}>
-                    <thead><tr style={{backgroundColor:'#f9fafb'}}><th style={{padding:'14px 20px',textAlign:'left',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>员工信息</th><th style={{padding:'14px 20px',textAlign:'left',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>企业邮箱</th><th style={{padding:'14px 20px',textAlign:'left',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>所属部门</th><th style={{padding:'14px 20px',textAlign:'left',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>角色</th><th style={{padding:'14px 20px',textAlign:'right',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>操作</th></tr></thead>
+                    <thead><tr style={{backgroundColor:'#f9fafb'}}><th style={{padding:'14px 20px',textAlign:'left',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>员工</th><th style={{padding:'14px 20px',textAlign:'left',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>邮箱</th><th style={{padding:'14px 20px',textAlign:'left',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>部门</th><th style={{padding:'14px 20px',textAlign:'left',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>角色</th><th style={{padding:'14px 20px',textAlign:'right',fontSize:'13px',fontWeight:'600',color:'#6b7280',borderBottom:'1px solid #e5e7eb'}}>操作</th></tr></thead>
                     <tbody>
                       {loading ? <tr><td colSpan="5" style={{padding:'40px',textAlign:'center'}}><Icons.Spinner/></td></tr> : filtered.length === 0 ? <tr><td colSpan="5" style={{padding:'40px',textAlign:'center',color:'#9ca3af'}}>暂无数据</td></tr> : filtered.map(u => (
                         <tr key={u.id} style={{borderBottom:'1px solid #f3f4f6'}}>
-                          <td style={{padding:'16px 20px'}}><div style={{display:'flex',alignItems:'center',gap:'12px'}}><div style={{width:'40px',height:'40px',borderRadius:'10px',backgroundColor:'#0d9488',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'600'}}>{u.name?.[0]||'?'}</div><div style={{fontWeight:'600'}}>{u.name}</div></div></td>
+                          <td style={{padding:'16px 20px'}}><div style={{display:'flex',alignItems:'center',gap:'12px'}}><div style={{width:'40px',height:'40px',borderRadius:'10px',backgroundColor:'#0d9488',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'600'}}>{u.name?.[0]||'?'}</div><span style={{fontWeight:'600'}}>{u.name}</span></div></td>
                           <td style={{padding:'16px 20px',color:'#6b7280',fontSize:'14px'}}>{u.email}</td>
                           <td style={{padding:'16px 20px'}}><span style={{padding:'4px 12px',borderRadius:'20px',backgroundColor:'#f0fdfa',color:'#0d9488',fontSize:'13px'}}>{departments.find(d => d.id === u.department_id)?.name || '未分配'}</span></td>
                           <td style={{padding:'16px 20px'}}><span style={{padding:'4px 12px',borderRadius:'20px',backgroundColor:u.role==='admin'?'#fef3c7':'#f3f4f6',color:u.role==='admin'?'#d97706':'#6b7280',fontSize:'13px'}}>{u.role==='admin'?'管理员':'员工'}</span></td>
@@ -654,10 +1042,9 @@
             <form onSubmit={handleSubmit}>
               <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>姓名 *</label><input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}} required/></div>
               <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>用户名 *</label><div style={{display:'flex'}}><input type="text" value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '')})} style={{flex:1,padding:'12px',borderRadius:'10px 0 0 10px',border:'1px solid #e5e7eb',borderRight:'none',fontSize:'14px'}}/><span style={{padding:'12px',backgroundColor:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'0 10px 10px 0',color:'#6b7280',fontSize:'14px'}}>@mykiwiedu.com</span></div></div>
-              <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>{user ? '重置密码' : '初始密码'}</label><input type="text" value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder={user ? '留空不修改' : '设置初始密码'} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}}/></div>
               <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>所属部门 *</label><select value={form.department_id} onChange={e => setForm({...form, department_id: e.target.value})} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',backgroundColor:'white'}} required><option value="">请选择</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
               <div style={{marginBottom:'24px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>角色</label><div style={{display:'flex',gap:'12px'}}>{['employee', 'admin'].map(r => (<label key={r} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px',borderRadius:'10px',border:form.role===r?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:form.role===r?'#f0fdfa':'white',cursor:'pointer'}}><input type="radio" name="role" checked={form.role===r} onChange={() => setForm({...form, role: r})} style={{display:'none'}}/><span style={{color:form.role===r?'#0d9488':'#6b7280'}}>{r==='employee'?'普通员工':'管理员'}</span></label>))}</div></div>
-              <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary" style={{opacity:saving?0.7:1}}>{saving ? '保存中...' : '保存'}</button></div>
+              <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary">{saving ? '保存中...' : '保存'}</button></div>
             </form>
           </div></div>
         );
@@ -673,7 +1060,7 @@
             <form onSubmit={handleSubmit}>
               <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>部门名称 *</label><input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px'}} required/></div>
               <div style={{marginBottom:'24px'}}><label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>部门描述</label><textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'14px',minHeight:'80px',resize:'vertical'}}/></div>
-              <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary" style={{opacity:saving?0.7:1}}>{saving ? '保存中...' : '保存'}</button></div>
+              <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={saving} className="btn-primary">{saving ? '保存中...' : '保存'}</button></div>
             </form>
           </div></div>
         );
@@ -690,6 +1077,7 @@
         const [loading, setLoading] = useState(true);
         const [error, setError] = useState(null);
         const [taskModal, setTaskModal] = useState({ open: false, task: null, moduleId: null });
+        const [resources, setResources] = useState([]);
 
         const isAdmin = currentUser?.role === 'admin';
 
@@ -703,6 +1091,11 @@
           if (!selectedDepartment) return;
           const { data } = await supabase.from('training_modules').select('*, training_tasks(*)').eq('department_id', selectedDepartment.id).order('sort_order');
           if (data) setTrainingModules(data.map(m => ({ ...m, training_tasks: m.training_tasks?.sort((a, b) => a.sort_order - b.sort_order) || [] })));
+        };
+
+        const fetchResources = async () => {
+          const { data } = await supabase.from('resources').select('*').order('created_at', { ascending: false });
+          setResources(data || []);
         };
 
         const handleToggleComplete = async (taskId) => {
@@ -723,53 +1116,54 @@
 
         const handleDeleteTask = async (taskId) => { if (!confirm('确定删除？')) return; await supabase.from('training_tasks').delete().eq('id', taskId); await fetchTrainingModules(); };
 
-        useEffect(() => { (async () => { setLoading(true); setCurrentUser({ id: 'demo-user-id', name: '管理员', role: 'admin', email: 'admin@mykiwiedu.com' }); await fetchDepartments(); setLoading(false); })(); }, []);
+        useEffect(() => { (async () => { setLoading(true); setCurrentUser({ id: 'demo-user-id', name: '管理员', role: 'admin', email: 'admin@mykiwiedu.com' }); await fetchDepartments(); await fetchResources(); setLoading(false); })(); }, []);
         useEffect(() => { if (selectedDepartment) fetchTrainingModules(); }, [selectedDepartment]);
 
         if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:'12px'}}><Icons.Spinner/><span style={{color:'#6b7280'}}>加载中...</span></div>;
         if (error) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:'12px'}}><div style={{color:'#ef4444'}}>❌ {error}</div><button onClick={() => window.location.reload()} className="btn-primary">重新加载</button></div>;
 
         const navItems = [
-          { id: 'dashboard', label: '总览 Dashboard', icon: Icons.Dashboard },
-          { id: 'training', label: '培训计划 Training', icon: Icons.Training },
-          { id: 'roleplay', label: 'AI 陪练 Role-Play', icon: Icons.RolePlay },
-          { id: 'resources', label: '资料库 Resources', icon: Icons.Resources },
-          { id: 'users', label: '账号管理 Users', icon: Icons.Users },
+          { id: 'dashboard', label: '总览', icon: Icons.Dashboard },
+          { id: 'training', label: '培训计划', icon: Icons.Training },
+          { id: 'resources', label: '资料库', icon: Icons.Resources },
+          { id: 'roleplay', label: 'AI 陪练', icon: Icons.RolePlay },
+          { id: 'users', label: '账号管理', icon: Icons.Users },
         ];
 
         const renderPage = () => {
           switch (activeNav) {
             case 'dashboard': return <Dashboard departments={departments} supabase={supabase}/>;
-            case 'training': return <TrainingPage departments={departments} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} trainingModules={trainingModules} userProgress={userProgress} onToggleComplete={handleToggleComplete} onEditTask={task => setTaskModal({ open: true, task, moduleId: task.module_id })} onDeleteTask={handleDeleteTask} onAddTask={moduleId => setTaskModal({ open: true, task: null, moduleId })} isAdmin={isAdmin} supabase={supabase} onRefresh={fetchTrainingModules} currentUser={currentUser}/>;
+            case 'training': return <TrainingPage departments={departments} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} trainingModules={trainingModules} userProgress={userProgress} onToggleComplete={handleToggleComplete} onEditTask={task => setTaskModal({ open: true, task, moduleId: task.module_id })} onDeleteTask={handleDeleteTask} onAddTask={moduleId => setTaskModal({ open: true, task: null, moduleId })} isAdmin={isAdmin} supabase={supabase} onRefresh={fetchTrainingModules} currentUser={currentUser} resources={resources}/>;
+            case 'resources': return <ResourcesPage supabase={supabase} isAdmin={isAdmin}/>;
             case 'users': return <UsersPage departments={departments} supabase={supabase} onDepartmentsChange={fetchDepartments}/>;
-            default: return <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}><h2 style={{marginTop:'16px',color:'#1f2937'}}>功能开发中...</h2></div>;
+            default: return <div style={{textAlign:'center',padding:'60px',color:'#9ca3af'}}><h2 style={{color:'#1f2937'}}>功能开发中...</h2></div>;
           }
         };
 
         return (
           <div style={{display:'flex',minHeight:'100vh',backgroundColor:'#f8fafa'}}>
             {/* Sidebar */}
-            <div style={{width:'260px',backgroundColor:'#ffffff',borderRight:'1px solid #e5e7eb',display:'flex',flexDirection:'column',position:'fixed',height:'100vh',zIndex:100}}>
-              <div style={{padding:'24px 20px',borderBottom:'1px solid #f3f4f6'}}>
+            <div style={{width:'240px',backgroundColor:'#ffffff',borderRight:'1px solid #e5e7eb',display:'flex',flexDirection:'column',position:'fixed',height:'100vh',zIndex:100}}>
+              <div style={{padding:'20px 16px',borderBottom:'1px solid #f3f4f6'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-                  <div style={{width:'44px',height:'44px',borderRadius:'12px',background:'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 12px rgba(13, 148, 136, 0.3)'}}><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
-                  <div><div style={{fontSize:'18px',fontWeight:'700',color:'#0d9488'}}>KiwiTrain AI</div><div style={{fontSize:'11px',color:'#9ca3af',marginTop:'2px'}}>柯维留学事务所培训系统</div></div>
+                  <div style={{width:'40px',height:'40px',borderRadius:'10px',background:'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 12px rgba(13, 148, 136, 0.3)'}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+                  <div><div style={{fontSize:'16px',fontWeight:'700',color:'#0d9488'}}>KiwiTrain AI</div><div style={{fontSize:'10px',color:'#9ca3af'}}>柯维培训系统</div></div>
                 </div>
               </div>
-              <nav style={{padding:'16px 12px',flex:1}}>
-                {navItems.map(item => { const Icon = item.icon; const isActive = activeNav === item.id; return (<div key={item.id} onClick={() => setActiveNav(item.id)} style={{display:'flex',alignItems:'center',gap:'12px',padding:'12px 14px',borderRadius:'10px',marginBottom:'4px',cursor:'pointer',backgroundColor:isActive?'#f0fdfa':'transparent',color:isActive?'#0d9488':'#6b7280',fontWeight:isActive?'600':'500',fontSize:'14px'}}><Icon/><span>{item.label}</span></div>); })}
+              <nav style={{padding:'12px 8px',flex:1}}>
+                {navItems.map(item => { const Icon = item.icon; const isActive = activeNav === item.id; return (<div key={item.id} onClick={() => setActiveNav(item.id)} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',borderRadius:'8px',marginBottom:'2px',cursor:'pointer',backgroundColor:isActive?'#f0fdfa':'transparent',color:isActive?'#0d9488':'#6b7280',fontWeight:isActive?'600':'500',fontSize:'14px'}}><Icon/><span>{item.label}</span></div>); })}
               </nav>
-              <div style={{padding:'16px 20px',borderTop:'1px solid #f3f4f6'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}}>
-                  <div style={{width:'40px',height:'40px',borderRadius:'10px',backgroundColor:'#0d9488',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'600'}}>{currentUser?.name?.[0]||'A'}</div>
-                  <div><div style={{fontSize:'14px',fontWeight:'600',color:'#1f2937'}}>{currentUser?.name||'管理员'}</div><div style={{fontSize:'12px',color:'#9ca3af'}}>{isAdmin?'管理层':'员工'}</div></div>
+              <div style={{padding:'12px 16px',borderTop:'1px solid #f3f4f6'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px'}}>
+                  <div style={{width:'36px',height:'36px',borderRadius:'8px',backgroundColor:'#0d9488',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'600',fontSize:'14px'}}>{currentUser?.name?.[0]||'A'}</div>
+                  <div><div style={{fontSize:'13px',fontWeight:'600',color:'#1f2937'}}>{currentUser?.name||'管理员'}</div><div style={{fontSize:'11px',color:'#9ca3af'}}>{isAdmin?'管理员':'员工'}</div></div>
                 </div>
-                <div style={{display:'flex',alignItems:'center',gap:'8px',color:'#ef4444',fontSize:'14px',cursor:'pointer',padding:'8px 0'}}><Icons.Logout/><span>退出登录</span></div>
+                <div style={{display:'flex',alignItems:'center',gap:'6px',color:'#ef4444',fontSize:'13px',cursor:'pointer',padding:'6px 0'}}><Icons.Logout/><span>退出登录</span></div>
               </div>
             </div>
             
             {/* Main */}
-            <div style={{flex:1,marginLeft:'260px',padding:'32px 40px'}}>{renderPage()}</div>
+            <div style={{flex:1,marginLeft:'240px',padding:'28px 36px'}}>{renderPage()}</div>
             
             {taskModal.open && <TaskModal task={taskModal.task} moduleId={taskModal.moduleId} onSave={handleSaveTask} onClose={() => setTaskModal({ open: false, task: null, moduleId: null })}/>}
           </div>
