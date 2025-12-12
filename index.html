@@ -556,6 +556,9 @@
         const [text, setText] = useState('');
         const [parsed, setParsed] = useState([]);
         const [error, setError] = useState('');
+        const [uploading, setUploading] = useState(false);
+        const [fileName, setFileName] = useState('');
+        const fileInputRef = React.useRef(null);
 
         const template = `1. 公司成立于哪一年？[单选]
 A. 2018年
@@ -625,7 +628,143 @@ D. 服务
           setParsed(questions);
         };
 
+        // Parse Excel file
+        const parseExcelFile = async (file) => {
+          setUploading(true);
+          setError('');
+          setFileName(file.name);
+          
+          try {
+            // Load SheetJS library dynamically
+            if (!window.XLSX) {
+              await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+              });
+            }
+
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data);
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+            const questions = [];
+            
+            // Skip header row, parse data rows
+            for (let i = 1; i < rows.length; i++) {
+              const row = rows[i];
+              if (!row || !row[0]) continue;
+
+              // Expected columns: 题目, 类型, 选项A, 选项B, 选项C, 选项D, 答案
+              const questionText = String(row[0] || '').trim();
+              const typeText = String(row[1] || '单选').trim();
+              const optA = String(row[2] || '').trim();
+              const optB = String(row[3] || '').trim();
+              const optC = String(row[4] || '').trim();
+              const optD = String(row[5] || '').trim();
+              const answerText = String(row[6] || '').trim().toUpperCase();
+
+              if (!questionText || !answerText) continue;
+
+              const options = [];
+              if (optA) options.push({ id: 'A', text: optA });
+              if (optB) options.push({ id: 'B', text: optB });
+              if (optC) options.push({ id: 'C', text: optC });
+              if (optD) options.push({ id: 'D', text: optD });
+
+              const isMultiple = typeText.includes('多选');
+              const correctAnswers = answerText.replace(/，/g, ',').split(',').map(a => a.trim()).filter(a => a);
+
+              if (options.length >= 2 && correctAnswers.length > 0) {
+                questions.push({
+                  question_text: questionText,
+                  question_type: isMultiple || correctAnswers.length > 1 ? 'multiple' : 'single',
+                  options,
+                  correct_answers: correctAnswers,
+                  points: 10
+                });
+              }
+            }
+
+            if (questions.length === 0) {
+              setError('未能从文件中解析任何题目，请检查格式');
+            } else {
+              setParsed(questions);
+              // Also show in text area
+              const textContent = questions.map((q, i) => {
+                const typeLabel = q.question_type === 'multiple' ? '[多选]' : '[单选]';
+                const optLines = q.options.map(o => `${o.id}. ${o.text}`).join('\n');
+                return `${i+1}. ${q.question_text} ${typeLabel}\n${optLines}\n答案: ${q.correct_answers.join(',')}`;
+              }).join('\n\n');
+              setText(textContent);
+            }
+          } catch (err) {
+            setError('文件解析失败：' + err.message);
+          } finally {
+            setUploading(false);
+          }
+        };
+
+        // Handle file selection
+        const handleFileSelect = (e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+              parseExcelFile(file);
+            } else if (file.name.endsWith('.txt')) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                const content = e.target.result;
+                setText(content);
+                parseQuestions(content);
+                setFileName(file.name);
+              };
+              reader.readAsText(file);
+            } else {
+              setError('请上传 Excel (.xlsx) 或文本 (.txt) 文件');
+            }
+          }
+        };
+
+        // Handle drag and drop
+        const handleDrop = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const file = e.dataTransfer.files?.[0];
+          if (file) {
+            if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.txt')) {
+              if (file.name.endsWith('.txt')) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  const content = ev.target.result;
+                  setText(content);
+                  parseQuestions(content);
+                  setFileName(file.name);
+                };
+                reader.readAsText(file);
+              } else {
+                parseExcelFile(file);
+              }
+            } else {
+              setError('请上传 Excel (.xlsx) 或文本 (.txt) 文件');
+            }
+          }
+        };
+
+        const handleDragOver = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        };
+
         const handleDownloadTemplate = () => {
+          // Download Excel template
+          window.open('/考核题目模版.xlsx', '_blank');
+        };
+
+        const handleDownloadTxtTemplate = () => {
           const blob = new Blob([template], { type: 'text/plain;charset=utf-8' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -645,12 +784,67 @@ D. 服务
                 <div>• 答案行格式：答案: A 或 答案: A,B,C</div>
                 <div>• 题目之间用空行分隔</div>
               </div>
-              <button onClick={handleDownloadTemplate} style={{marginTop:'12px',display:'flex',alignItems:'center',gap:'6px',color:'#0d9488',background:'none',border:'none',cursor:'pointer',fontSize:'13px',fontWeight:'500'}}><Icons.Download/>下载模版文件</button>
+              <div style={{marginTop:'12px',display:'flex',gap:'16px'}}>
+                <button onClick={handleDownloadTxtTemplate} style={{display:'flex',alignItems:'center',gap:'6px',color:'#0d9488',background:'none',border:'none',cursor:'pointer',fontSize:'13px',fontWeight:'500'}}><Icons.Download/>下载文本模版</button>
+              </div>
+            </div>
+
+            {/* File Upload Zone */}
+            <div style={{marginBottom:'16px'}}>
+              <label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>上传文件</label>
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                style={{
+                  border: '2px dashed #d1d5db',
+                  borderRadius: '10px',
+                  padding: '24px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  backgroundColor: '#fafafa',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  accept=".xlsx,.xls,.txt"
+                  onChange={handleFileSelect}
+                  style={{display:'none'}}
+                />
+                {uploading ? (
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',color:'#6b7280'}}>
+                    <Icons.Spinner/> 解析文件中...
+                  </div>
+                ) : fileName ? (
+                  <div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',color:'#059669',marginBottom:'4px'}}>
+                      <Icons.CheckCircle/> 已选择: {fileName}
+                    </div>
+                    <div style={{fontSize:'12px',color:'#9ca3af'}}>点击重新选择文件</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{width:'48px',height:'48px',borderRadius:'50%',backgroundColor:'#e0f2fe',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
+                      <Icons.Upload/>
+                    </div>
+                    <div style={{color:'#374151',fontWeight:'500',marginBottom:'4px'}}>点击上传或拖拽文件到此处</div>
+                    <div style={{fontSize:'13px',color:'#9ca3af'}}>支持 Excel (.xlsx) 或文本 (.txt) 文件</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'16px'}}>
+              <div style={{flex:1,height:'1px',backgroundColor:'#e5e7eb'}}/>
+              <span style={{fontSize:'13px',color:'#9ca3af'}}>或手动粘贴</span>
+              <div style={{flex:1,height:'1px',backgroundColor:'#e5e7eb'}}/>
             </div>
 
             <div style={{marginBottom:'16px'}}>
               <label style={{display:'block',marginBottom:'6px',fontSize:'14px',fontWeight:'500'}}>粘贴题目内容</label>
-              <textarea value={text} onChange={e => { setText(e.target.value); parseQuestions(e.target.value); }} placeholder={template} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'13px',minHeight:'200px',fontFamily:'monospace',resize:'vertical'}}/>
+              <textarea value={text} onChange={e => { setText(e.target.value); parseQuestions(e.target.value); }} placeholder={template} style={{width:'100%',padding:'12px',borderRadius:'10px',border:'1px solid #e5e7eb',fontSize:'13px',minHeight:'180px',fontFamily:'monospace',resize:'vertical'}}/>
             </div>
 
             {error && <div style={{padding:'12px',backgroundColor:'#fef2f2',color:'#dc2626',borderRadius:'8px',marginBottom:'16px',fontSize:'13px'}}>{error}</div>}
