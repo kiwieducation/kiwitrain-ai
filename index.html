@@ -1018,6 +1018,7 @@ D. 服务
         const [submitting, setSubmitting] = useState(false);
         const [result, setResult] = useState(null);
         const [showFireworks, setShowFireworks] = useState(false);
+        const [questionResults, setQuestionResults] = useState({});
 
         useEffect(() => {
           const fetch = async () => {
@@ -1029,7 +1030,7 @@ D. 服务
         }, []);
 
         const handleSelect = (qId, optId, isMultiple) => {
-          if (isReview) return;
+          if (isReview || result) return;
           if (isMultiple) {
             const current = answers[qId] || [];
             setAnswers({ ...answers, [qId]: current.includes(optId) ? current.filter(a => a !== optId) : [...current, optId] });
@@ -1043,16 +1044,21 @@ D. 服务
           setSubmitting(true);
 
           let score = 0, totalPoints = 0;
+          const qResults = {};
+          
           questions.forEach(q => {
             totalPoints += q.points;
             const userAns = (answers[q.id] || []).sort().join(',');
             const correctAns = (q.correct_answers || []).sort().join(',');
-            if (userAns === correctAns) score += q.points;
+            const isCorrect = userAns === correctAns;
+            if (isCorrect) score += q.points;
+            qResults[q.id] = { isCorrect, userAnswers: answers[q.id] || [], correctAnswers: q.correct_answers || [] };
           });
 
           const passed = score === totalPoints; // Must be 100%
           await supabase.from('quiz_attempts').insert({ user_id: currentUser.id, task_id: task.id, answers, score, total_points: totalPoints, passed });
           
+          setQuestionResults(qResults);
           setResult({ score, totalPoints, passed, percentage: Math.round((score / totalPoints) * 100) });
           if (passed) {
             setShowFireworks(true);
@@ -1061,61 +1067,131 @@ D. 服务
           setSubmitting(false);
         };
 
+        const handleRetry = () => {
+          setResult(null);
+          setAnswers({});
+          setQuestionResults({});
+        };
+
         if (loading) return <div className="modal-overlay"><div className="modal-content" style={{width:'600px',textAlign:'center',padding:'60px'}}><Icons.Spinner/><p style={{marginTop:'12px',color:'#6b7280'}}>加载题目...</p></div></div>;
 
-        if (result) return (
+        return (
           <>
             <Fireworks show={showFireworks} onComplete={() => setShowFireworks(false)}/>
             <div className="modal-overlay" onClick={onClose}>
-              <div className="modal-content" style={{width:'420px',textAlign:'center'}} onClick={e => e.stopPropagation()}>
-                <div style={{width:'100px',height:'100px',borderRadius:'50%',backgroundColor:result.passed?'#d1fae5':'#fee2e2',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 24px',fontSize:'48px'}}>{result.passed ? '🎉' : '😅'}</div>
-                <h3 style={{fontSize:'28px',fontWeight:'700',marginBottom:'8px',color:result.passed?'#059669':'#dc2626'}}>{result.passed ? '🎊 恭喜通过！' : '继续加油！'}</h3>
-                <p style={{fontSize:'56px',fontWeight:'700',color:'#1f2937',marginBottom:'8px'}}>{result.percentage}<span style={{fontSize:'24px'}}>分</span></p>
-                <p style={{color:'#6b7280',marginBottom:'24px'}}>
-                  {result.passed ? '你已完美完成本次考核！' : `需要100分才能通过，你还差 ${result.totalPoints - result.score} 分`}
-                </p>
-                <button onClick={onClose} className="btn-primary" style={{width:'100%',padding:'14px',fontSize:'16px'}}>{result.passed ? '太棒了！' : '再试一次'}</button>
+              <div className="modal-content" style={{width:'720px',maxHeight:'85vh'}} onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'24px',position:'sticky',top:0,backgroundColor:'white',paddingBottom:'16px',borderBottom:'1px solid #e5e7eb',zIndex:10}}>
+                  <div>
+                    <h3 style={{fontSize:'20px',fontWeight:'600',margin:0}}>
+                      {result ? (result.passed ? '🎉 考核通过！' : '📊 答题结果') : (isReview ? '📖 复习模式' : '📝 考核测试')}
+                    </h3>
+                    <p style={{fontSize:'14px',color:'#6b7280',margin:'4px 0 0'}}>
+                      {result ? `得分: ${result.score}/${result.totalPoints} (${result.percentage}分)` : (isReview ? '查看正确答案' : `共 ${questions.length} 题，需全部答对(100分)通过`)}
+                    </p>
+                  </div>
+                  <button onClick={onClose} className="btn-icon" style={{backgroundColor:'#f3f4f6',color:'#6b7280'}}><Icons.X/></button>
+                </div>
+
+                {/* Result Summary Card */}
+                {result && (
+                  <div style={{padding:'20px',marginBottom:'20px',borderRadius:'12px',backgroundColor:result.passed?'#d1fae5':'#fef2f2',textAlign:'center'}}>
+                    <div style={{fontSize:'48px',marginBottom:'8px'}}>{result.passed ? '🎊' : '😅'}</div>
+                    <div style={{fontSize:'24px',fontWeight:'700',color:result.passed?'#059669':'#dc2626',marginBottom:'4px'}}>
+                      {result.passed ? '恭喜，全部答对！' : '还需努力！'}
+                    </div>
+                    <div style={{fontSize:'14px',color:result.passed?'#047857':'#b91c1c'}}>
+                      {result.passed ? '你已完美完成本次考核' : `答对 ${questions.filter(q => questionResults[q.id]?.isCorrect).length}/${questions.length} 题，需要全部答对才能通过`}
+                    </div>
+                  </div>
+                )}
+
+                {/* Questions List */}
+                <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
+                  {questions.map((q, i) => {
+                    const qResult = questionResults[q.id];
+                    const showResult = result && qResult;
+                    
+                    return (
+                      <div key={q.id} style={{padding:'16px',backgroundColor:showResult ? (qResult.isCorrect ? '#f0fdf4' : '#fef2f2') : '#f9fafb',borderRadius:'12px',border:showResult ? (qResult.isCorrect ? '2px solid #86efac' : '2px solid #fca5a5') : 'none'}}>
+                        {/* Question Header */}
+                        <div style={{display:'flex',gap:'8px',marginBottom:'10px',alignItems:'center',flexWrap:'wrap'}}>
+                          <span style={{backgroundColor:'#0d9488',color:'white',padding:'3px 10px',borderRadius:'5px',fontSize:'12px',fontWeight:'600'}}>第 {i+1} 题</span>
+                          <span style={{backgroundColor:'#dbeafe',color:'#3b82f6',padding:'3px 10px',borderRadius:'5px',fontSize:'12px'}}>{q.question_type === 'single' ? '单选' : '多选'}</span>
+                          <span style={{backgroundColor:'#fef3c7',color:'#d97706',padding:'3px 10px',borderRadius:'5px',fontSize:'12px'}}>{q.points}分</span>
+                          {showResult && (
+                            <span style={{marginLeft:'auto',padding:'3px 10px',borderRadius:'5px',fontSize:'12px',fontWeight:'600',backgroundColor:qResult.isCorrect?'#dcfce7':'#fee2e2',color:qResult.isCorrect?'#16a34a':'#dc2626'}}>
+                              {qResult.isCorrect ? '✓ 正确' : '✗ 错误'}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Question Text */}
+                        <div style={{fontSize:'14px',fontWeight:'500',marginBottom:'12px',lineHeight:'1.5'}}>{q.question_text}</div>
+                        
+                        {/* Options */}
+                        <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                          {q.options?.map(opt => {
+                            const selected = (answers[q.id] || []).includes(opt.id);
+                            const isCorrectOption = q.correct_answers?.includes(opt.id);
+                            const showCorrectInReview = isReview && isCorrectOption;
+                            
+                            // After submission styling
+                            let optBg = 'white', optBorder = '1px solid #e5e7eb', optColor = '#374151', badgeEl = null;
+                            
+                            if (showResult) {
+                              if (isCorrectOption && selected) {
+                                // Correct and selected
+                                optBg = '#dcfce7'; optBorder = '2px solid #22c55e'; optColor = '#15803d';
+                                badgeEl = <span style={{fontSize:'11px',color:'#16a34a',fontWeight:'600'}}>✓ 正确</span>;
+                              } else if (isCorrectOption && !selected) {
+                                // Correct but not selected (show correct answer)
+                                optBg = '#fef9c3'; optBorder = '2px solid #facc15'; optColor = '#a16207';
+                                badgeEl = <span style={{fontSize:'11px',color:'#ca8a04',fontWeight:'600'}}>← 正确答案</span>;
+                              } else if (!isCorrectOption && selected) {
+                                // Wrong and selected
+                                optBg = '#fee2e2'; optBorder = '2px solid #ef4444'; optColor = '#b91c1c';
+                                badgeEl = <span style={{fontSize:'11px',color:'#dc2626',fontWeight:'600'}}>✗ 你的选择</span>;
+                              }
+                            } else if (showCorrectInReview) {
+                              optBg = '#d1fae5'; optBorder = '2px solid #10b981'; optColor = '#059669';
+                            } else if (selected) {
+                              optBg = '#f0fdfa'; optBorder = '2px solid #0d9488'; optColor = '#0d9488';
+                            }
+                            
+                            return (
+                              <div key={opt.id} onClick={() => handleSelect(q.id, opt.id, q.question_type === 'multiple')} style={{padding:'10px 14px',borderRadius:'8px',border:optBorder,backgroundColor:optBg,cursor:(isReview || result)?'default':'pointer',display:'flex',alignItems:'center',gap:'10px'}}>
+                                <div style={{width:'24px',height:'24px',borderRadius:q.question_type==='single'?'50%':'5px',backgroundColor:(showCorrectInReview || selected || (showResult && isCorrectOption))?'#0d9488':'#f3f4f6',color:(showCorrectInReview || selected || (showResult && isCorrectOption))?'white':'#6b7280',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'600',fontSize:'12px',flexShrink:0}}>{opt.id}</div>
+                                <span style={{color:optColor,flex:1,fontSize:'13px'}}>{opt.text}</span>
+                                {showCorrectInReview && <span style={{color:'#10b981',fontSize:'12px'}}>✓ 正确答案</span>}
+                                {badgeEl}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer Buttons */}
+                <div style={{position:'sticky',bottom:0,backgroundColor:'white',paddingTop:'16px',borderTop:'1px solid #e5e7eb',marginTop:'20px'}}>
+                  {!isReview && !result && (
+                    <button onClick={handleSubmit} disabled={submitting} className="btn-primary" style={{width:'100%',padding:'12px',fontSize:'14px'}}>{submitting ? '提交中...' : '提交答卷'}</button>
+                  )}
+                  {result && !result.passed && (
+                    <div style={{display:'flex',gap:'12px'}}>
+                      <button onClick={onClose} className="btn-secondary" style={{flex:1,padding:'12px',fontSize:'14px'}}>关闭</button>
+                      <button onClick={handleRetry} className="btn-primary" style={{flex:1,padding:'12px',fontSize:'14px'}}>重新答题</button>
+                    </div>
+                  )}
+                  {result && result.passed && (
+                    <button onClick={onClose} className="btn-primary" style={{width:'100%',padding:'12px',fontSize:'14px'}}>🎉 太棒了！</button>
+                  )}
+                </div>
               </div>
             </div>
           </>
-        );
-
-        return (
-          <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{width:'720px',maxHeight:'85vh'}} onClick={e => e.stopPropagation()}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'24px',position:'sticky',top:0,backgroundColor:'white',paddingBottom:'16px',borderBottom:'1px solid #e5e7eb',zIndex:10}}>
-                <div><h3 style={{fontSize:'20px',fontWeight:'600',margin:0}}>{isReview ? '📖 复习模式' : '📝 考核测试'}</h3><p style={{fontSize:'14px',color:'#6b7280',margin:'4px 0 0'}}>{isReview ? '查看正确答案' : `共 ${questions.length} 题，需全部答对(100分)通过`}</p></div>
-                <button onClick={onClose} className="btn-icon" style={{backgroundColor:'#f3f4f6',color:'#6b7280'}}><Icons.X/></button>
-              </div>
-
-              <div style={{display:'flex',flexDirection:'column',gap:'24px'}}>
-                {questions.map((q, i) => (
-                  <div key={q.id} style={{padding:'20px',backgroundColor:'#f9fafb',borderRadius:'12px'}}>
-                    <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}><span style={{backgroundColor:'#0d9488',color:'white',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:'600'}}>第 {i+1} 题</span><span style={{backgroundColor:'#dbeafe',color:'#3b82f6',padding:'4px 12px',borderRadius:'6px',fontSize:'13px'}}>{q.question_type === 'single' ? '单选' : '多选'}</span><span style={{backgroundColor:'#fef3c7',color:'#d97706',padding:'4px 12px',borderRadius:'6px',fontSize:'13px'}}>{q.points}分</span></div>
-                    <div style={{fontSize:'16px',fontWeight:'500',marginBottom:'16px',lineHeight:'1.6'}}>{q.question_text}</div>
-                    <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
-                      {q.options?.map(opt => {
-                        const selected = (answers[q.id] || []).includes(opt.id);
-                        const isCorrect = q.correct_answers?.includes(opt.id);
-                        const showCorrect = isReview && isCorrect;
-                        return (<div key={opt.id} onClick={() => handleSelect(q.id, opt.id, q.question_type === 'multiple')} style={{padding:'14px 16px',borderRadius:'10px',border:showCorrect?'2px solid #10b981':selected?'2px solid #0d9488':'1px solid #e5e7eb',backgroundColor:showCorrect?'#d1fae5':selected?'#f0fdfa':'white',cursor:isReview?'default':'pointer',display:'flex',alignItems:'center',gap:'12px'}}>
-                          <div style={{width:'28px',height:'28px',borderRadius:q.question_type==='single'?'50%':'6px',backgroundColor:showCorrect?'#10b981':selected?'#0d9488':'#f3f4f6',color:showCorrect||selected?'white':'#6b7280',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'600',fontSize:'13px'}}>{opt.id}</div>
-                          <span style={{color:showCorrect?'#059669':selected?'#0d9488':'#374151',flex:1}}>{opt.text}</span>
-                          {showCorrect && <span style={{color:'#10b981'}}>✓ 正确答案</span>}
-                        </div>);
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {!isReview && (
-                <div style={{position:'sticky',bottom:0,backgroundColor:'white',paddingTop:'20px',borderTop:'1px solid #e5e7eb',marginTop:'24px'}}>
-                  <button onClick={handleSubmit} disabled={submitting} className="btn-primary" style={{width:'100%',padding:'14px',fontSize:'16px'}}>{submitting ? '提交中...' : '提交答卷'}</button>
-                </div>
-              )}
-            </div>
-          </div>
         );
       };
 
