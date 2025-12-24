@@ -517,15 +517,20 @@ const TrainingPage = ({ departments, selectedDepartment, setSelectedDepartment, 
   const [showModuleModal, setShowModuleModal] = useState<TrainingModule | null>(null);
   const [showPhaseModal, setShowPhaseModal] = useState<TrainingPhase | null>(null);
 
+  // 管理员可以看到所有部门
+  const isAdmin = currentUser?.role === 'admin';
   const userDept = departments.find(d => String(d.id) === String(currentUser?.department_id));
-  const isStrategyOrAdmin = userDept?.name?.includes('战略') || userDept?.name?.includes('行政') || currentUser?.role === 'admin';
-  const visibleDepartments = isStrategyOrAdmin ? departments : departments.filter(d => String(d.id) === String(currentUser?.department_id));
+  const isStrategyOrAdmin = isAdmin || userDept?.name?.includes('战略') || userDept?.name?.includes('行政');
+  
+  // 可见部门：管理员/战略组/行政组看所有，其他人只看自己部门
+  const visibleDepartments = (isAdmin || isStrategyOrAdmin) ? departments : departments.filter(d => String(d.id) === String(currentUser?.department_id));
 
+  // 自动选择第一个部门
   useEffect(() => {
-    if (!isStrategyOrAdmin && userDept && (!selectedDepartment || selectedDepartment.id !== userDept.id)) {
-      setSelectedDepartment(userDept);
+    if (visibleDepartments.length > 0 && !selectedDepartment) {
+      setSelectedDepartment(visibleDepartments[0]);
     }
-  }, [userDept, isStrategyOrAdmin]);
+  }, [visibleDepartments, selectedDepartment]);
 
   const modulesByPhase: Record<string, TrainingModule[]> = {};
   const unassignedModules: TrainingModule[] = [];
@@ -1217,22 +1222,30 @@ const MainApp = () => {
   const canManageUsers = hasPerm(currentUser, 'manage_users') || hasPerm(currentUser, 'all');
 
   const fetchDepartments = async () => {
-    const { data } = await supabase.from('departments').select('*').order('sort_order');
-    if (data?.length) {
+    const { data, error } = await supabase.from('departments').select('*').order('sort_order');
+    console.log('Fetched departments:', data, error);
+    if (data && data.length > 0) {
       setDepartments(data as Department[]);
+      // 设置默认选中的部门
       if (!selectedDepartment) {
-        const userDept = data.find((d: any) => String(d.id) === String(currentUser?.department_id));
-        const isStrategyOrAdmin = userDept?.name?.includes('战略') || userDept?.name?.includes('行政') || currentUser?.role === 'admin';
-        setSelectedDepartment((isStrategyOrAdmin ? data[0] : userDept || data[0]) as Department);
+        setSelectedDepartment(data[0] as Department);
       }
     }
   };
 
   const fetchTrainingModules = async () => {
-    if (!selectedDepartment) return;
-    const { data: phasesData } = await supabase.from('training_phases').select('*').eq('department_id', selectedDepartment.id).order('sort_order');
+    if (!selectedDepartment) {
+      console.log('No selected department, skipping fetch');
+      return;
+    }
+    console.log('Fetching modules for department:', selectedDepartment.id, selectedDepartment.name);
+    
+    const { data: phasesData, error: phasesError } = await supabase.from('training_phases').select('*').eq('department_id', selectedDepartment.id).order('sort_order');
+    console.log('Fetched phases:', phasesData, phasesError);
     setTrainingPhases((phasesData as TrainingPhase[]) || []);
-    const { data } = await supabase.from('training_modules').select('*, training_tasks(*)').eq('department_id', selectedDepartment.id).order('sort_order');
+    
+    const { data, error } = await supabase.from('training_modules').select('*, training_tasks(*)').eq('department_id', selectedDepartment.id).order('sort_order');
+    console.log('Fetched modules:', data, error);
     setTrainingModules((data as TrainingModule[]) || []);
   };
 
