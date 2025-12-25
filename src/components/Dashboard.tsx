@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabase } from "../lib/supabaseClient";
-import { getSessionUser } from "../lib/session";
-import { hasPerm } from "../lib/permissions";
-import { isLeader as isLeaderFn } from "../lib/rbac";
+import { supabase } from "@/lib/supabaseClient";
+import { getSessionUser } from "@/lib/session";
+import { hasPerm } from "@/lib/permissions";
+import { isLeader as isLeaderFn } from "@/lib/rbac";
 
 type Department = { id: string; name: string; sort_order: number | null };
 type TrainingTask = { id: string; module_id: string; sort_order: number | null; title?: string | null };
