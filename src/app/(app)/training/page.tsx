@@ -95,10 +95,16 @@ export default function TrainingPage() {
         const ids = taskData.map((t) => String(t.id));
         if (ids.length) {
           // task_materials
-          let mats = await supabase.from("task_materials").select("id,task_id").in("task_id", ids);
-          if (mats.error && /column .*task_id/.test(mats.error.message)) {
-            mats = await supabase.from("task_materials").select("id,training_task_id").in("training_task_id", ids);
-          }
+          // 这里 task_materials 可能是 task_id 或 training_task_id 两种列名（兼容旧表结构）
+// 为了避免 TS 因为“二次赋值字段不一致”而报错，这里用 any 承接返回类型。
+let mats: any = await supabase.from("task_materials").select("id,task_id").in("task_id", ids);
+
+if (mats?.error && /column .*task_id/i.test(mats.error.message)) {
+  mats = await supabase
+    .from("task_materials")
+    .select("id,training_task_id")
+    .in("training_task_id", ids);
+}
           if (!mats.error) {
             const mcount: Record<string, number> = {};
             for (const r of mats.data ?? []) {
