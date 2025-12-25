@@ -15,11 +15,11 @@ function pick(obj: any, keys: string[]) {
 
 async function detectFkColumn(table: string) {
   // Try task_id first, fallback to training_task_id (compat)
-  let probe = await supabase.from(table).select("id,task_id").limit(1);
-  if (!probe.error) return "task_id" as const;
+  let probe: any = await supabase.from(table).select("id,task_id").limit(1);
+if (!probe.error) return "task_id" as const;
 
-  probe = await supabase.from(table).select("id,training_task_id").limit(1);
-  if (!probe.error) return "training_task_id" as const;
+probe = await supabase.from(table).select("id,training_task_id").limit(1);
+if (!probe.error) return "training_task_id" as const;
 
   // last resort: still return task_id, and let insert/show error for us
   return "task_id" as const;
