@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
-import { getSessionUser } from "@/lib/session";
-import { hasPerm } from "@/lib/permissions";
-import { isLeader as isLeaderFn } from "@/lib/rbac";
+import Sidebar from "./Sidebar";
+import { supabase } from "../lib/supabaseClient";
+import { getSessionUser } from "../lib/session";
+import { hasPerm } from "../lib/permissions";
+import { isLeader as isLeaderFn } from "../lib/rbac";
+import type { UserRow } from "../lib/types";
 
 type Department = { id: string; name: string; sort_order: number | null };
-type TrainingTask = { id: string; module_id: string; sort_order: number | null; title?: string | null };
 type TrainingModule = {
   id: string;
   department_id: string;
@@ -16,57 +17,95 @@ type TrainingModule = {
   day_number?: number | null;
   title?: string | null;
 };
-type UserRow = { id: string; name?: string | null; role?: string | null; department_id?: string | null; custom_perms?: any };
+type TrainingTask = {
+  id: string;
+  module_id: string;
+  sort_order: number | null;
+  title?: string | null;
+};
 type ProgressRow = { user_id: string; task_id: string; status?: string | null; completed?: boolean | null };
 
-const Icon = {
-  Sparkles: () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-slate-700">
-      <path d="M12 2l1.2 5.1L18 8.3l-4.3 2.1L12 16l-1.7-5.6L6 8.3l4.8-1.2L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M5 14l.7 2.8L9 18l-3.3 1.2L5 22l-.7-2.8L1 18l3.3-1.2L5 14Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M19 13l.8 2.4L22 16l-2.2.6L19 19l-.8-2.4L16 16l2.2-.6L19 13Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-    </svg>
-  ),
-  StatsDept: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-emerald-700">
-      <path d="M4 21V3h16v18H4Z" stroke="currentColor" strokeWidth="2" />
-      <path d="M8 7h2M8 11h2M8 15h2M14 7h2M14 11h2M14 15h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  ),
-  StatsModule: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-amber-700">
-      <path d="M4 6h16v12H4V6Z" stroke="currentColor" strokeWidth="2" />
-      <path d="M8 10h8M8 14h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  ),
-  StatsTask: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-sky-700">
-      <path d="M9 11l2 2 4-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  StatsUsers: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-rose-700">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" strokeWidth="2" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  ),
-  ProgressTitle: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-slate-800">
-      <path d="M4 19V5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M8 19V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M12 19V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M16 19V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M20 19V9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  ),
-};
+function clsx(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
+}
 
 function pct(n: number) {
   if (!isFinite(n)) return 0;
   return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function Icon({ name, className }: { name: "dashboard" | "book" | "check" | "users" | "building" | "sparkle"; className?: string }) {
+  const c = className ?? "h-5 w-5";
+  if (name === "dashboard") {
+    return (
+      <svg className={c} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 13h7V4H4v9Zm9 7h7V11h-7v9ZM4 20h7v-5H4v5Zm9-18v7h7V2h-7Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+      </svg>
+    );
+  }
+  if (name === "book") {
+    return (
+      <svg className={c} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M7 4h10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2V6a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+        <path d="M7 4v14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+      </svg>
+    );
+  }
+  if (name === "check") {
+    return (
+      <svg className={c} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    );
+  }
+  if (name === "users") {
+    return (
+      <svg className={c} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0Z" stroke="currentColor" strokeWidth="1.6"/>
+        <path d="M4 20a8 8 0 0 1 16 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+      </svg>
+    );
+  }
+  if (name === "building") {
+    return (
+      <svg className={c} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 20V6a2 2 0 0 1 2-2h7v16H4Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+        <path d="M13 10h5a2 2 0 0 1 2 2v8h-7V10Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+        <path d="M7 8h3M7 12h3M7 16h3M16 14h2M16 17h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+      </svg>
+    );
+  }
+  return (
+    <svg className={c} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 2l1.2 4.3L18 8l-4.8 1.7L12 14l-1.2-4.3L6 8l4.8-1.7L12 2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+      <path d="M19 14l.7 2.4L22 17l-2.3.6L19 20l-.7-2.4L16 17l2.3-.6L19 14Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function Avatar({ user, size = 32 }: { user: { name?: string | null; avatar_url?: string | null }; size?: number }) {
+  const initials = (user?.name || "?").trim().slice(0, 2).toUpperCase();
+  const s = `${size}px`;
+  if (user?.avatar_url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={user.avatar_url}
+        alt={user?.name || "avatar"}
+        className="rounded-full object-cover border border-slate-200"
+        style={{ width: s, height: s }}
+      />
+    );
+  }
+  return (
+    <div
+      className="rounded-full bg-emerald-600 text-white flex items-center justify-center font-semibold border border-emerald-700/20"
+      style={{ width: s, height: s, fontSize: size <= 28 ? "12px" : "13px" }}
+      aria-hidden="true"
+    >
+      {initials}
+    </div>
+  );
 }
 
 function ProgressBar({ rate }: { rate: number }) {
@@ -86,11 +125,7 @@ function ProgressBadge({ rate }: { rate: number }) {
       : r >= 50
       ? "bg-amber-50 text-amber-700 border-amber-200"
       : "bg-rose-50 text-rose-700 border-rose-200";
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${cls}`}>
-      {r}%
-    </span>
-  );
+  return <span className={clsx("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold", cls)}>{r}%</span>;
 }
 
 function StatCard({
@@ -105,14 +140,14 @@ function StatCard({
   subtitle: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+      <div className="flex items-start justify-between">
         <div>
           <div className="text-sm font-semibold text-slate-700">{title}</div>
-          <div className="mt-2 text-4xl font-extrabold text-slate-900">{value}</div>
-          <div className="mt-1 text-xs text-slate-500">{subtitle}</div>
+          <div className="mt-2 text-3xl font-extrabold text-slate-900">{value}</div>
+          <div className="mt-2 text-xs text-slate-500">{subtitle}</div>
         </div>
-        <div className="h-10 w-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+        <div className="h-11 w-11 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-700">
           {icon}
         </div>
       </div>
@@ -120,17 +155,9 @@ function StatCard({
   );
 }
 
-function initials(name?: string | null) {
-  const s = (name || "").trim();
-  if (!s) return "U";
-  const parts = s.split(/\s+/);
-  const a = parts[0]?.[0] || s[0];
-  const b = parts.length > 1 ? parts[1]?.[0] : s.length > 1 ? s[1] : "";
-  return (a + b).toUpperCase();
-}
-
 export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState<UserRow | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [modules, setModules] = useState<TrainingModule[]>([]);
@@ -138,9 +165,110 @@ export default function Dashboard() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [progress, setProgress] = useState<ProgressRow[]>([]);
 
-  const [loading, setLoading] = useState(true);
   const [expandedDept, setExpandedDept] = useState<Record<string, boolean>>({});
   const [expandedUser, setExpandedUser] = useState<Record<string, boolean>>({});
+
+  const isLeader = useMemo(() => (currentUser ? isLeaderFn(currentUser as any) : false), [currentUser]);
+
+  const visibleDepartments = useMemo(() => {
+    if (!currentUser) return [];
+    if (isLeader && currentUser.department_id) {
+      return departments.filter((d) => String(d.id) === String(currentUser.department_id));
+    }
+    return departments;
+  }, [departments, currentUser, isLeader]);
+
+  const modulesByDept = useMemo(() => {
+    const m = new Map<string, TrainingModule[]>();
+    for (const mod of modules) {
+      const k = String(mod.department_id);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k)!.push(mod);
+    }
+    for (const [k, arr] of m) {
+      arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      m.set(k, arr);
+    }
+    return m;
+  }, [modules]);
+
+  const tasksByModule = useMemo(() => {
+    const m = new Map<string, TrainingTask[]>();
+    for (const t of tasks) {
+      const k = String(t.module_id);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k)!.push(t);
+    }
+    for (const [k, arr] of m) {
+      arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      m.set(k, arr);
+    }
+    return m;
+  }, [tasks]);
+
+  const userByDept = useMemo(() => {
+    const m = new Map<string, UserRow[]>();
+    for (const u of users) {
+      const k = String(u.department_id ?? "");
+      if (!k) continue;
+      if (!m.has(k)) m.set(k, []);
+      m.get(k)!.push(u);
+    }
+    for (const [k, arr] of m) {
+      arr.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "zh"));
+      m.set(k, arr);
+    }
+    return m;
+  }, [users]);
+
+  const progressByUser = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const p of progress) {
+      const done = p.completed === true || p.status === "done" || p.status === "completed";
+      if (!done) continue;
+      const uid = String(p.user_id);
+      const tid = String(p.task_id);
+      if (!m.has(uid)) m.set(uid, new Set());
+      m.get(uid)!.add(tid);
+    }
+    return m;
+  }, [progress]);
+
+  const allTaskIdsByDept = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const d of departments) {
+      const did = String(d.id);
+      const modList = modulesByDept.get(did) ?? [];
+      const taskIds: string[] = [];
+      for (const mod of modList) {
+        const tl = tasksByModule.get(String(mod.id)) ?? [];
+        for (const t of tl) taskIds.push(String(t.id));
+      }
+      m.set(did, taskIds);
+    }
+    return m;
+  }, [departments, modulesByDept, tasksByModule]);
+
+  const topStats = useMemo(() => {
+    const deptCount = visibleDepartments.length;
+    const visibleDeptIds = new Set(visibleDepartments.map((d) => String(d.id)));
+    const visibleModules = modules.filter((m) => visibleDeptIds.has(String(m.department_id)));
+    const visibleModuleIds = new Set(visibleModules.map((m) => String(m.id)));
+    const visibleTasks = tasks.filter((t) => visibleModuleIds.has(String(t.module_id)));
+    const visibleUsers = users.filter((u) => u.department_id && visibleDeptIds.has(String(u.department_id)));
+    return { deptCount, moduleCount: visibleModules.length, taskCount: visibleTasks.length, userCount: visibleUsers.length };
+  }, [visibleDepartments, modules, tasks, users]);
+
+  const toggleDept = (deptId: string) => setExpandedDept((p) => ({ ...p, [deptId]: !(p[deptId] ?? false) }));
+  const toggleUser = (userId: string) => setExpandedUser((p) => ({ ...p, [userId]: !(p[userId] ?? false) }));
+
+  const handleLogout = async () => {
+    try {
+      // @ts-expect-error - supabase auth may be absent in some builds
+      await supabase?.auth?.signOut?.();
+    } catch {}
+    window.location.href = "/login";
+  };
 
   useEffect(() => {
     (async () => {
@@ -155,333 +283,224 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!currentUser) return;
+
     (async () => {
       setLoading(true);
+      const [{ data: deptData }, { data: modData }, { data: taskData }, { data: userData }, { data: progData }] =
+        await Promise.all([
+          supabase.from("departments").select("id,name,sort_order").order("sort_order"),
+          supabase.from("training_modules").select("id,department_id,sort_order,day_number,title").order("sort_order"),
+          supabase.from("training_tasks").select("id,module_id,sort_order,title").order("sort_order"),
+          supabase.from("users").select("id,name,role,department_id,custom_perms,avatar_url"),
+          supabase.from("user_task_progress").select("user_id,task_id,status,completed"),
+        ]);
 
-      // 取数：departments / training_modules / training_tasks / users / user_task_progress
-      const depRes = await supabase.from("departments").select("id,name,sort_order").order("sort_order", { ascending: true });
-      const modRes = await supabase.from("training_modules").select("id,department_id,sort_order,day_number,title").order("sort_order", { ascending: true });
-      const taskRes = await supabase.from("training_tasks").select("id,module_id,sort_order,title").order("sort_order", { ascending: true });
-      const userRes = await supabase.from("users").select("id,name,role,department_id,custom_perms");
-      const progRes = await supabase.from("user_task_progress").select("user_id,task_id,status,completed");
-
-      setDepartments((depRes.data as any) || []);
-      setModules((modRes.data as any) || []);
-      setTasks((taskRes.data as any) || []);
-      setUsers((userRes.data as any) || []);
-      setProgress((progRes.data as any) || []);
-
+      setDepartments((deptData as any) ?? []);
+      setModules((modData as any) ?? []);
+      setTasks((taskData as any) ?? []);
+      setUsers((userData as any) ?? []);
+      setProgress((progData as any) ?? []);
       setLoading(false);
     })();
   }, [currentUser]);
 
-  const isAdmin = (currentUser?.role || "") === "admin" || (currentUser?.role || "") === "admin_staff";
-  const isLeader = currentUser ? isLeaderFn(currentUser as any) : false;
-  const canSeeDashboard = isAdmin || hasPerm(currentUser as any, "view_team_progress");
+  if (!currentUser) return null;
 
-  // 领导只看自己部门（你现有逻辑）
-  const leaderDeptId = useMemo(() => {
-    if (!currentUser) return null;
-    const role = currentUser.role || "";
-    if (role !== "leader") return null;
-    return currentUser.department_id ? String(currentUser.department_id) : null;
-  }, [currentUser]);
-
-  const visibleDepartments = useMemo(() => {
-    if (!currentUser) return [];
-    if (isLeader && leaderDeptId) {
-      return departments.filter((d) => String(d.id) === String(leaderDeptId));
-    }
-    return departments;
-  }, [departments, currentUser, isLeader, leaderDeptId]);
-
-  const deptIdToUsers = useMemo(() => {
-    const map: Record<string, UserRow[]> = {};
-    for (const u of users) {
-      const did = String(u.department_id || "");
-      if (!did) continue;
-      if (!map[did]) map[did] = [];
-      map[did].push(u);
-    }
-    // 可按名字排序
-    for (const k of Object.keys(map)) {
-      map[k].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "zh-Hans-CN"));
-    }
-    return map;
-  }, [users]);
-
-  const moduleIdToTasks = useMemo(() => {
-    const map: Record<string, TrainingTask[]> = {};
-    for (const t of tasks) {
-      const mid = String(t.module_id || "");
-      if (!mid) continue;
-      if (!map[mid]) map[mid] = [];
-      map[mid].push(t);
-    }
-    for (const k of Object.keys(map)) {
-      map[k].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-    }
-    return map;
-  }, [tasks]);
-
-  const deptIdToAllTasks = useMemo(() => {
-    const map: Record<string, TrainingTask[]> = {};
-    const deptModules: Record<string, TrainingModule[]> = {};
-    for (const m of modules) {
-      const did = String(m.department_id || "");
-      if (!did) continue;
-      if (!deptModules[did]) deptModules[did] = [];
-      deptModules[did].push(m);
-    }
-    for (const did of Object.keys(deptModules)) {
-      const list: TrainingTask[] = [];
-      deptModules[did].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-      for (const m of deptModules[did]) {
-        const tlist = moduleIdToTasks[String(m.id)] || [];
-        for (const t of tlist) list.push(t);
-      }
-      map[did] = list;
-    }
-    return map;
-  }, [modules, moduleIdToTasks]);
-
-  const progressSetByUser = useMemo(() => {
-    const map: Record<string, Set<string>> = {};
-    for (const p of progress) {
-      const uid = String(p.user_id);
-      const tid = String(p.task_id);
-      const done = p.completed === true || p.status === "completed";
-      if (!done) continue;
-      if (!map[uid]) map[uid] = new Set<string>();
-      map[uid].add(tid);
-    }
-    return map;
-  }, [progress]);
-
-  const stat = useMemo(() => {
-    const deptCount = visibleDepartments.length;
-    const moduleCount = modules.length;
-    const taskCount = tasks.length;
-    const userCount = users.filter((u) => !!u.department_id).length;
-    return { deptCount, moduleCount, taskCount, userCount };
-  }, [visibleDepartments, modules, tasks, users]);
-
-  const deptCards = useMemo(() => {
-    // 每个部门：完成率 = 该部门所有任务里，所有员工平均完成？（旧版偏“部门整体进度”）
-    // 这里用：部门所有员工完成任务数 / (部门员工数 * 任务总数)
-    return visibleDepartments.map((d) => {
-      const did = String(d.id);
-      const dUsers = deptIdToUsers[did] || [];
-      const dTasks = deptIdToAllTasks[did] || [];
-      const total = dUsers.length * dTasks.length;
-
-      let done = 0;
-      for (const u of dUsers) {
-        const set = progressSetByUser[String(u.id)] || new Set<string>();
-        done += dTasks.reduce((acc, t) => acc + (set.has(String(t.id)) ? 1 : 0), 0);
-      }
-
-      const rate = total > 0 ? (done / total) * 100 : 0;
-
-      return { dept: d, users: dUsers, tasks: dTasks, rate, totalTasks: dTasks.length };
-    });
-  }, [visibleDepartments, deptIdToUsers, deptIdToAllTasks, progressSetByUser]);
-
-  const toggleDept = (deptId: string) => {
-    setExpandedDept((p) => ({ ...p, [deptId]: !(p[deptId] ?? false) }));
-  };
-  const toggleUser = (userId: string) => {
-    setExpandedUser((p) => ({ ...p, [userId]: !(p[userId] ?? false) }));
-  };
-
-  if (!canSeeDashboard) {
-    return (
-      <div className="p-8">
-        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
-          <div className="text-xl font-bold text-slate-800">无权限访问</div>
-          <div className="mt-2 text-sm text-slate-500">仅管理员与可查看团队进度的账号可见。</div>
-          <div className="mt-6">
-            <Link className="text-emerald-700 underline" href="/training">
-              返回培训计划
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const title = isLeader && !isAdmin ? "团队进度" : "总览 Dashboard";
+  const canSeeUsers = currentUser.role === "admin" || hasPerm(currentUser as any, "manage_users");
+  const canSeeSales = currentUser.role === "admin" || hasPerm(currentUser as any, "sales_dep_access");
 
   return (
-    <div className="p-8">
-      {/* 1 + 2：标题带图标 + 副标题 */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2">
-          <Icon.Sparkles />
-          <h1 className="text-2xl font-extrabold text-slate-900">{title}</h1>
-        </div>
-        <div className="mt-1 text-sm text-slate-600">查看公司培训整体情况与员工学习进度</div>
-        <div className="mt-2 text-xs text-slate-400">
-          统计来自：training_modules / training_tasks / users / user_task_progress
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="flex">
+        <Sidebar user={currentUser as any} active="dashboard" onLogout={handleLogout} />
 
-      {/* 5：4块统计卡片加图标 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard icon={<Icon.StatsDept />} title="部门总数" value={stat.deptCount} subtitle="活跃部门" />
-        <StatCard icon={<Icon.StatsModule />} title="培训模块" value={stat.moduleCount} subtitle="课程模块" />
-        <StatCard icon={<Icon.StatsTask />} title="培训任务" value={stat.taskCount} subtitle="总任务数" />
-        <StatCard icon={<Icon.StatsUsers />} title="员工人数" value={stat.userCount} subtitle="在培人员" />
-      </div>
-
-      {/* 6：部门培训进度 标题加图标 + 副标题 */}
-      <div className="mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="px-6 py-5 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <Icon.ProgressTitle />
-            <div className="text-lg font-bold text-slate-900">{isLeader ? "团队成员培训进度" : "部门培训进度"}</div>
-          </div>
-          <div className="mt-1 text-sm text-slate-500">点击员工姓名可查看具体任务完成详情</div>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {loading && (
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-slate-500 text-sm">
-              正在加载...
-            </div>
-          )}
-
-          {!loading &&
-            deptCards.map(({ dept, users: dUsers, tasks: dTasks, rate, totalTasks }) => {
-              const did = String(dept.id);
-              const open = expandedDept[did] ?? false;
-
-              return (
-                <div key={did} className="rounded-2xl border border-slate-200 bg-slate-50/40">
-                  <button
-                    className="w-full px-5 py-4 flex items-center justify-between"
-                    onClick={() => toggleDept(did)}
-                    type="button"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-10 w-10 rounded-2xl bg-emerald-600 text-white font-extrabold flex items-center justify-center">
-                        {dept.name?.slice(0, 1) || "部"}
-                      </div>
-                      <div className="min-w-0 text-left">
-                        <div className="font-bold text-slate-900 truncate">{dept.name}</div>
-                        <div className="text-xs text-slate-500">
-                          👥 {dUsers.length} 员工 · 📚 {modules.filter((m) => String(m.department_id) === did).length} 模块 · ✅ {totalTasks} 任务
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="w-40 hidden md:block">
-                        <ProgressBar rate={rate} />
-                      </div>
-                      <ProgressBadge rate={rate} />
-                      <div className="text-slate-500">{open ? "▲" : "▼"}</div>
-                    </div>
-                  </button>
-
-                  {/* 7：员工头像 + 点击展开任务进度 */}
-                  {open && (
-                    <div className="px-5 pb-5">
-                      {dUsers.length === 0 ? (
-                        <div className="rounded-xl bg-white border border-slate-200 p-4 text-sm text-slate-500">
-                          该部门暂无员工。
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                          {dUsers.map((u) => {
-                            const uid = String(u.id);
-                            const uOpen = expandedUser[uid] ?? false;
-
-                            const doneSet = progressSetByUser[uid] || new Set<string>();
-                            const doneCount = dTasks.reduce((acc, t) => acc + (doneSet.has(String(t.id)) ? 1 : 0), 0);
-                            const uRate = dTasks.length > 0 ? (doneCount / dTasks.length) * 100 : 0;
-
-                            return (
-                              <div key={uid} className="rounded-2xl border border-slate-200 bg-white">
-                                <button
-                                  onClick={() => toggleUser(uid)}
-                                  type="button"
-                                  className="w-full px-4 py-4 flex items-center justify-between gap-4"
-                                >
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <div className="h-10 w-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center font-bold text-slate-700">
-                                      {initials(u.name)}
-                                    </div>
-                                    <div className="min-w-0 text-left">
-                                      <div className="font-semibold text-slate-900 truncate">{u.name || "未命名"}</div>
-                                      <div className="text-xs text-slate-500">已完成 {doneCount}/{dTasks.length}</div>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-28 hidden md:block">
-                                      <ProgressBar rate={uRate} />
-                                    </div>
-                                    <ProgressBadge rate={uRate} />
-                                    <div className="text-slate-500">{uOpen ? "▲" : "▼"}</div>
-                                  </div>
-                                </button>
-
-                                {uOpen && (
-                                  <div className="px-4 pb-4">
-                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                      <div className="text-xs font-semibold text-slate-700 mb-2">任务明细</div>
-                                      <div className="space-y-2 max-h-64 overflow-auto pr-1">
-                                        {dTasks.length === 0 && (
-                                          <div className="text-sm text-slate-500">该部门暂无任务。</div>
-                                        )}
-
-                                        {dTasks.map((t) => {
-                                          const tid = String(t.id);
-                                          const done = doneSet.has(tid);
-                                          return (
-                                            <div
-                                              key={tid}
-                                              className="flex items-center justify-between gap-3 rounded-lg bg-white border border-slate-200 px-3 py-2"
-                                            >
-                                              <div className="flex items-center gap-2 min-w-0">
-                                                <span
-                                                  className={`h-2.5 w-2.5 rounded-full ${
-                                                    done ? "bg-emerald-600" : "bg-slate-300"
-                                                  }`}
-                                                />
-                                                <div className="text-sm text-slate-800 truncate">
-                                                  {t.title || `任务 ${tid}`}
-                                                </div>
-                                              </div>
-                                              <div className="text-xs font-semibold">
-                                                {done ? (
-                                                  <span className="text-emerald-700">已完成</span>
-                                                ) : (
-                                                  <span className="text-slate-500">未完成</span>
-                                                )}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
+        <main className="flex-1">
+          <div className="mx-auto max-w-6xl px-6 py-7">
+            <div className="mb-6">
+              <div className="flex items-center gap-2">
+                <div className="h-9 w-9 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                  <Icon name="dashboard" className="h-5 w-5" />
                 </div>
-              );
-            })}
-        </div>
-      </div>
+                <h1 className="text-2xl font-extrabold text-slate-900">总览 Dashboard</h1>
+              </div>
+              <p className="mt-2 text-sm text-slate-500">查看公司培训整体情况与员工学习进度</p>
+            </div>
 
-      {/* 8：底部“去培训计划”等按钮 —— 已移除（此处不再渲染任何按钮） */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <StatCard icon={<Icon name="building" />} title="部门总数" value={topStats.deptCount} subtitle="活跃部门" />
+              <StatCard icon={<Icon name="book" />} title="培训模块" value={topStats.moduleCount} subtitle="课程模块" />
+              <StatCard icon={<Icon name="check" />} title="培训任务" value={topStats.taskCount} subtitle="总任务数" />
+              <StatCard icon={<Icon name="users" />} title="员工人数" value={topStats.userCount} subtitle="在培人员" />
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="px-6 py-5 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-700">
+                    <Icon name="sparkle" className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-base font-bold text-slate-900">部门培训进度</div>
+                    <div className="mt-1 text-xs text-slate-500">点击员工姓名可查看具体任务完成详情</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {loading && (
+                  <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-slate-500 text-sm">
+                    正在加载...
+                  </div>
+                )}
+
+                {!loading && visibleDepartments.length === 0 && (
+                  <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-slate-500 text-sm">
+                    暂无部门数据。
+                  </div>
+                )}
+
+                {!loading &&
+                  visibleDepartments.map((dept) => {
+                    const did = String(dept.id);
+                    const deptUsers = userByDept.get(did) ?? [];
+                    const deptTaskIds = allTaskIdsByDept.get(did) ?? [];
+                    const totalTasks = deptTaskIds.length || 0;
+
+                    const rates = deptUsers.map((u) => {
+                      const done = progressByUser.get(String(u.id)) ?? new Set();
+                      const completed = deptTaskIds.reduce((acc, tid) => acc + (done.has(tid) ? 1 : 0), 0);
+                      return totalTasks ? completed / totalTasks : 0;
+                    });
+                    const deptRate = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
+
+                    const expanded = expandedDept[did] ?? false;
+
+                    return (
+                      <div key={did} className="rounded-2xl border border-slate-200 bg-white">
+                        <button onClick={() => toggleDept(did)} className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50/60 rounded-2xl">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-10 w-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-extrabold shadow-sm">
+                              {(dept.name || "?").slice(0, 1)}
+                            </div>
+                            <div className="min-w-0 text-left">
+                              <div className="font-bold text-slate-900 truncate">{dept.name}</div>
+                              <div className="mt-1 text-xs text-slate-500 flex items-center gap-3">
+                                <span className="inline-flex items-center gap-1">
+                                  <Icon name="users" className="h-4 w-4" />
+                                  {deptUsers.length} 员工
+                                </span>
+                                <span className="inline-flex items-center gap-1">
+                                  <Icon name="check" className="h-4 w-4" />
+                                  {totalTasks} 任务
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="w-40 hidden md:block">
+                              <ProgressBar rate={deptRate * 100} />
+                            </div>
+                            <ProgressBadge rate={deptRate * 100} />
+                            <div className="text-slate-500">{expanded ? "▲" : "▼"}</div>
+                          </div>
+                        </button>
+
+                        {expanded && (
+                          <div className="px-5 pb-5">
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                              {deptUsers.map((u) => {
+                                const uid = String(u.id);
+                                const done = progressByUser.get(uid) ?? new Set();
+                                const completed = deptTaskIds.reduce((acc, tid) => acc + (done.has(tid) ? 1 : 0), 0);
+                                const rate = totalTasks ? completed / totalTasks : 0;
+                                const uExpanded = expandedUser[uid] ?? false;
+
+                                return (
+                                  <div key={uid} className="rounded-2xl border border-slate-200 bg-white">
+                                    <button onClick={() => toggleUser(uid)} className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 rounded-2xl">
+                                      <div className="flex items-center gap-3">
+                                        <Avatar user={u as any} size={32} />
+                                        <div className="text-left">
+                                          <div className="font-semibold text-slate-900">{u.name || "未命名员工"}</div>
+                                          <div className="text-xs text-slate-500">已完成 {completed}/{totalTasks}</div>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <ProgressBadge rate={rate * 100} />
+                                        <div className="text-slate-500">{uExpanded ? "▲" : "▼"}</div>
+                                      </div>
+                                    </button>
+
+                                    {uExpanded && (
+                                      <div className="px-4 pb-4">
+                                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                          <div className="text-xs font-semibold text-slate-700 mb-2">任务完成详情</div>
+                                          <div className="space-y-1 max-h-64 overflow-auto pr-1">
+                                            {deptTaskIds.length === 0 && <div className="text-xs text-slate-500">该部门暂无任务。</div>}
+                                            {deptTaskIds.map((tid) => {
+                                              const t = tasks.find((x) => String(x.id) === String(tid));
+                                              const ok = done.has(String(tid));
+                                              return (
+                                                <div key={tid} className="flex items-start gap-2 text-sm">
+                                                  <div
+                                                    className={clsx(
+                                                      "mt-1 h-4 w-4 rounded-full border flex items-center justify-center",
+                                                      ok ? "bg-emerald-600 border-emerald-600 text-white" : "bg-white border-slate-300 text-transparent"
+                                                    )}
+                                                    aria-hidden="true"
+                                                  >
+                                                    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none">
+                                                      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                  </div>
+                                                  <div className={clsx("text-sm", ok ? "text-slate-900" : "text-slate-700")}>
+                                                    {t?.title || `任务 ${tid}`}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {deptUsers.length === 0 && (
+                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-slate-500 text-sm">
+                                  该部门暂无员工。
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            <div className="mt-6 text-xs text-slate-400">统计来源：departments / training_modules / training_tasks / users / user_task_progress</div>
+
+            {(canSeeUsers || canSeeSales) && (
+              <div className="mt-3 text-sm text-slate-500">
+                {canSeeUsers && (
+                  <Link href="/users" className="text-emerald-700 hover:underline mr-4">
+                    账号管理
+                  </Link>
+                )}
+                {canSeeSales && (
+                  <Link href="/salesdep" className="text-emerald-700 hover:underline">
+                    销售顾问 AI工作台
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
