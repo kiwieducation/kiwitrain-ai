@@ -115,10 +115,15 @@ if (mats?.error && /column .*task_id/i.test(mats.error.message)) {
           }
 
           // quiz_questions
-          let qq = await supabase.from("quiz_questions").select("id,task_id").in("task_id", ids);
-          if (qq.error && /column .*task_id/.test(qq.error.message)) {
-            qq = await supabase.from("quiz_questions").select("id,training_task_id").in("training_task_id", ids);
-          }
+          // quiz_questions 也可能是 task_id 或 training_task_id（兼容旧表结构）
+let qq: any = await supabase.from("quiz_questions").select("id,task_id").in("task_id", ids);
+
+if (qq?.error && /column .*task_id/i.test(qq.error.message)) {
+  qq = await supabase
+    .from("quiz_questions")
+    .select("id,training_task_id")
+    .in("training_task_id", ids);
+}
           if (!qq.error) {
             const qcount: Record<string, number> = {};
             for (const r of qq.data ?? []) {
